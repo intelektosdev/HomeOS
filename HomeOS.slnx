@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HomeOS.Api/HomeOS.Api.csproj" />
+    <Project Path="src/HomeOS.Domain/HomeOS.Domain.fsproj" />
+    <Project Path="src/HomeOS.Infra/HomeOS.Infra.csproj" />
+    <Project Path="src/HomeOS.IntegrationTests/HomeOS.IntegrationTests.csproj" />
+    <Project Path="src/HomeOS.Tests/HomeOS.Tests.csproj" />
+  </Folder>
+</Solution>

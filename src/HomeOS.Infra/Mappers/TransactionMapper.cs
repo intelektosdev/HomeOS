@@ -14,8 +14,7 @@ public static class TransactionMapper
         {
             Id = domain.Id,
             UserId = Guid.Parse("22f4bd46-313d-424a-83b9-0c367ad46c3b"), // TODO: Pegar do contexto de usuário real
-            CategoryId = Guid.Parse("22f4bd46-313d-424a-83b9-0c367ad46c3b"), // TODO: Pegar da categoria real
-            AccountId = Guid.Parse("22f4bd46-313d-424a-83b9-0c367ad46c3b"),  // TODO: Pegar da conta real
+            CategoryId = domain.CategoryId, // Agora vem do domínio!
 
             Description = domain.Description,
             Amount = domain.Amount,
@@ -26,6 +25,20 @@ public static class TransactionMapper
             DueDate = domain.DueDate,
             CreatedAt = domain.CreatedAt
         };
+
+        // Mapping Source (F# DU -> Flat DB Columns)
+        if (domain.Source.IsFromAccount)
+        {
+            var source = (TransactionSource.FromAccount)domain.Source;
+            dbModel.AccountId = source.accountId;
+            dbModel.CreditCardId = null;
+        }
+        else if (domain.Source.IsFromCreditCard)
+        {
+            var source = (TransactionSource.FromCreditCard)domain.Source;
+            dbModel.AccountId = null;
+            dbModel.CreditCardId = source.creditCardId;
+        }
 
         // Mapping Status (F# DU -> Flat DB Columns)
         switch (domain.Status.Tag)
@@ -69,8 +82,23 @@ public static class TransactionMapper
         // Convertendo byte para TransactionType (F# Union)
         var type = db.Type == 1 ? TransactionType.Income : TransactionType.Expense;
 
-        // Como o tipo F# record é imutável e não tem CLIMutable, usamos o construtor gerado
-        // A ordem dos argumentos no construtor padrão do F# é a ordem de declaração dos campos
+        // Reconstruindo o Source
+        TransactionSource source;
+        if (db.AccountId.HasValue)
+        {
+            source = TransactionSource.NewFromAccount(db.AccountId.Value);
+        }
+        else if (db.CreditCardId.HasValue)
+        {
+            source = TransactionSource.NewFromCreditCard(db.CreditCardId.Value);
+        }
+        else
+        {
+            // Fallback temporário ou erro: Assumindo conta padrão se banco estiver inconsistente
+            // Idealmente lançaria exceção se o banco garante INTEGRIDADE
+            source = TransactionSource.NewFromAccount(Guid.Empty);
+        }
+
         return new Transaction(
             db.Id,
             db.Description,
@@ -78,7 +106,9 @@ public static class TransactionMapper
             status,
             db.Amount,
             db.DueDate,
-            db.CreatedAt
+            db.CreatedAt,
+            db.CategoryId,
+            source
         );
 
     }

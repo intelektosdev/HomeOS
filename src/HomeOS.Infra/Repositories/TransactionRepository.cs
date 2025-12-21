@@ -5,19 +5,14 @@ using Microsoft.Extensions.Configuration;
 using HomeOS.Domain.FinancialTypes; // Seu Domínio F#
 using HomeOS.Infra.Mappers;    // Seu Mapper C#
 using HomeOS.Infra.DataModels;
+using System.Collections.Generic;
 
 namespace HomeOS.Infra.Repositories;
 
-public class TransactionRepository
+public class TransactionRepository(IConfiguration configuration)
 {
-    private readonly string _connectionString;
-
-    public TransactionRepository(IConfiguration configuration)
-    {
-        // Pega a string de conexão do appsettings.json
-        _connectionString = configuration.GetConnectionString("DefaultConnection")
+    private readonly string _connectionString = configuration.GetConnectionString("DefaultConnection")
                             ?? throw new Exception("ConnectionString não encontrada");
-    }
 
     // Método para SALVAR (INSERT/UPDATE)
     public void Save(Transaction transaction)
@@ -38,10 +33,13 @@ public class TransactionRepository
                     DueDate = @DueDate,
                     StatusId = @StatusId,
                     PaymentDate = @PaymentDate,
-                    CancellationReason = @CancellationReason
+                    CancellationReason = @CancellationReason,
+                    CategoryId = @CategoryId,
+                    AccountId = @AccountId,
+                    CreditCardId = @CreditCardId
             WHEN NOT MATCHED THEN
-                INSERT (Id, UserId, Description, Amount, Type, CategoryId, AccountId, DueDate, StatusId, CreatedAt)
-                VALUES (@Id, @UserId, @Description, @Amount, @Type, @CategoryId, @AccountId, @DueDate, @StatusId, @CreatedAt);";
+                INSERT (Id, UserId, Description, Amount, Type, CategoryId, AccountId, CreditCardId, DueDate, StatusId, CreatedAt)
+                VALUES (@Id, @UserId, @Description, @Amount, @Type, @CategoryId, @AccountId, @CreditCardId, @DueDate, @StatusId, @CreatedAt);";
 
         // 3. Executa
         using var connection = new SqlConnection(_connectionString);
@@ -56,8 +54,9 @@ public class TransactionRepository
     {
         const string sql = @"
             SELECT 
-                Id, Description, Amount, Type, DueDate, CreatedAt,
-                StatusId, PaymentDate, CancellationReason
+                Id, UserId, Description, Amount, Type, DueDate, CreatedAt,
+                StatusId, PaymentDate, CancellationReason,
+                CategoryId, AccountId, CreditCardId
             FROM [Finance].[Transactions]
             WHERE Id = @Id";
 
@@ -70,5 +69,30 @@ public class TransactionRepository
 
         // Converte POCO -> F# Domain
         return TransactionMapper.ToDomain(dbModel);
+
+    }
+
+    public IEnumerable<dynamic> GetStatement(DateTime startDate, DateTime endDate)
+    {
+        const string sql = @"
+        SELECT 
+            Id, 
+            Description, 
+            Amount, 
+            DueDate,
+            CASE 
+                WHEN StatusId = 1 THEN 'Pending'
+                WHEN StatusId = 2 THEN 'Paid'
+                WHEN StatusId = 3 THEN 'Conciliated'
+                WHEN StatusId = 4 THEN 'Cancelled'
+            END as StatusName
+        FROM [Finance].[Transactions]
+        WHERE DueDate BETWEEN @StartDate AND @EndDate
+        ORDER BY DueDate ASC";
+
+        using var connection = new SqlConnection(_connectionString);
+
+        // Retornamos dynamic ou criamos uma classe específica de leitura (ReadModel)
+        return connection.Query(sql, new { StartDate = startDate, EndDate = endDate });
     }
 }

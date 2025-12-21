@@ -5,6 +5,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Apenas registramos o Repositório. 
 // Ele mesmo lê a ConnectionString por dentro.
 builder.Services.AddScoped<TransactionRepository>();
+builder.Services.AddScoped<CategoryRepository>();
+builder.Services.AddScoped<AccountRepository>();
+builder.Services.AddScoped<CreditCardRepository>();
 
 builder.Services.AddControllers();
 
@@ -54,4 +57,3 @@ record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 }
 
 // Isso torna a classe Program pública para o projeto de testes
-public partial class Program { }    

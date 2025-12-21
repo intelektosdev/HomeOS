@@ -12,6 +12,7 @@ public class TransactionDbModel
     public byte Type { get; set; } // TINYINT no SQL vira byte no C#
     public Guid CategoryId { get; set; }
     public Guid? AccountId { get; set; }
+    public Guid? CreditCardId { get; set; }
     public DateTime DueDate { get; set; }
     public DateTime CreatedAt { get; set; }
 

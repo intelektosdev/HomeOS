@@ -12,10 +12,31 @@ public record CreateTransactionRequest(
     Guid? CreditCardId
 );
 
+public record UpdateTransactionRequest(
+    [Required] string Description,
+    [Range(0.01, 1000000)] decimal Amount,
+    DateTime DueDate,
+    [Required] Guid CategoryId,
+    Guid? AccountId,
+    Guid? CreditCardId
+);
+
+public record CancelTransactionRequest(
+    [Required] string Reason
+);
+
+public record PayTransactionRequest(DateTime? PaymentDate);
+public record ConciliateTransactionRequest(
+    DateTime? ConciliatedAt
+);
+
 public record TransactionResponse(
     Guid Id,
     string Description,
     decimal Amount,
     string Status,
-    DateTime DueDate
+    DateTime DueDate,
+    Guid CategoryId,
+    Guid? AccountId,
+    Guid? CreditCardId
 );

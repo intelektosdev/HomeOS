@@ -68,4 +68,25 @@ public class AccountController(AccountRepository repository) : ControllerBase
 
         return Ok(response);
     }
+
+    [HttpPatch("{id}/toggle-status")]
+    public IActionResult ToggleStatus(Guid id)
+    {
+        var account = _repository.GetById(id);
+        if (account == null) return NotFound();
+
+        // Toggle the IsActive status
+        var updatedAccount = AccountModule.toggleActive(account);
+        _repository.Save(updatedAccount);
+
+        var response = new AccountResponse(
+            updatedAccount.Id,
+            updatedAccount.Name,
+            updatedAccount.Type.ToString(),
+            updatedAccount.InitialBalance,
+            updatedAccount.IsActive
+        );
+
+        return Ok(response);
+    }
 }

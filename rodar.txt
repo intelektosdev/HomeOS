@@ -1,0 +1,7 @@
+cd C:\projetos\finance_dev\HomeOS\src\HomeOS.Api
+dotnet build
+dotnet run
+
+C:\projetos\finance_dev\HomeOS\src\HomeOS.Client>
+
+npm run dev

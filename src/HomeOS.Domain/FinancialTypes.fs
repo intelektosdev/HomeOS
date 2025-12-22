@@ -78,6 +78,11 @@ module AccountModule =
           InitialBalance = initialBalance
           IsActive = true }
 
+    let toggleActive (account: Account) =
+        { account with
+            IsActive = not account.IsActive }
+
+
 module CreditCardModule =
     type CreditCardError =
         | InvalidClosingDay
@@ -145,3 +150,46 @@ module TransactionModule =
             | Paid _
             | Conciliated _ -> Error TransactionAlreadyPaid
             | Cancelled _ -> Error TransactionIsCancelled
+
+    let cancel (transaction: Transaction) (reason: string) : Result<Transaction, DomainError> =
+        match transaction.Status with
+        | Conciliated _ -> Error TransactionIsCancelled
+        | Cancelled _ -> Error TransactionIsCancelled
+        | _ ->
+            Ok
+                { transaction with
+                    Status = Cancelled reason }
+
+    let update
+        (transaction: Transaction)
+        (description: string)
+        (amount: Money)
+        (dueDate: DateTime)
+        (categoryId: Guid)
+        (source: TransactionSource)
+        : Result<Transaction, DomainError> =
+
+        if amount <= 0m then
+            Error AmountMustBePositive
+        else
+            match transaction.Status with
+            | Cancelled _ -> Error TransactionIsCancelled
+            | _ ->
+                Ok
+                    { transaction with
+                        Description = description
+                        Amount = amount
+                        DueDate = dueDate
+                        CategoryId = categoryId
+                        Source = source }
+
+    let conciliate (transaction: Transaction) (conciliatedAt: DateTime) : Result<Transaction, DomainError> =
+        if conciliatedAt > DateTime.Now then
+            Error PaymentDateCannotBeInFuture
+        else
+            match transaction.Status with
+            | Cancelled _ -> Error TransactionIsCancelled
+            | _ ->
+                Ok
+                    { transaction with
+                        Status = Conciliated conciliatedAt }

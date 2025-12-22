@@ -33,13 +33,14 @@ public class TransactionRepository(IConfiguration configuration)
                     DueDate = @DueDate,
                     StatusId = @StatusId,
                     PaymentDate = @PaymentDate,
+                    ConciliatedDate = @ConciliatedDate,
                     CancellationReason = @CancellationReason,
                     CategoryId = @CategoryId,
                     AccountId = @AccountId,
                     CreditCardId = @CreditCardId
             WHEN NOT MATCHED THEN
-                INSERT (Id, UserId, Description, Amount, Type, CategoryId, AccountId, CreditCardId, DueDate, StatusId, CreatedAt)
-                VALUES (@Id, @UserId, @Description, @Amount, @Type, @CategoryId, @AccountId, @CreditCardId, @DueDate, @StatusId, @CreatedAt);";
+                INSERT (Id, UserId, Description, Amount, Type, CategoryId, AccountId, CreditCardId, DueDate, StatusId, CreatedAt, PaymentDate, ConciliatedDate, CancellationReason)
+                VALUES (@Id, @UserId, @Description, @Amount, @Type, @CategoryId, @AccountId, @CreditCardId, @DueDate, @StatusId, @CreatedAt, @PaymentDate, @ConciliatedDate, @CancellationReason);";
 
         // 3. Executa
         using var connection = new SqlConnection(_connectionString);
@@ -55,7 +56,7 @@ public class TransactionRepository(IConfiguration configuration)
         const string sql = @"
             SELECT 
                 Id, UserId, Description, Amount, Type, DueDate, CreatedAt,
-                StatusId, PaymentDate, CancellationReason,
+                StatusId, PaymentDate, ConciliatedDate, CancellationReason,
                 CategoryId, AccountId, CreditCardId
             FROM [Finance].[Transactions]
             WHERE Id = @Id";
@@ -80,12 +81,15 @@ public class TransactionRepository(IConfiguration configuration)
             Description, 
             Amount, 
             DueDate,
+            CategoryId,
+            AccountId,
+            CreditCardId,
             CASE 
                 WHEN StatusId = 1 THEN 'Pending'
                 WHEN StatusId = 2 THEN 'Paid'
                 WHEN StatusId = 3 THEN 'Conciliated'
                 WHEN StatusId = 4 THEN 'Cancelled'
-            END as StatusName
+            END as Status
         FROM [Finance].[Transactions]
         WHERE DueDate BETWEEN @StartDate AND @EndDate
         ORDER BY DueDate ASC";

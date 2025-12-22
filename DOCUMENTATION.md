@@ -9,69 +9,53 @@ O HomeOS é um sistema de gestão financeira pessoal/residencial projetado com u
 
 O projeto está organizado em uma solução .NET dividida nos seguintes projetos:
 
-*   **HomeOS.Domain (F#)**: Contém as entidades e regras de negócio. Utiliza o paradigma funcional para garantir que o estado do sistema seja consistente.
+*   **HomeOS.Domain (F#)**: Contém as entidades e regras de negócio. Utiliza o paradigma funcional para garantir que o estado do sistema seja consistente através de imutabilidade e tipos algébricos.
 *   **HomeOS.Infra (C#)**: Camada de infraestrutura responsável pelo acesso ao banco de dados SQL Server via Dapper e configuração do Entity Framework Core.
-*   **HomeOS.Api (C#)**: Interface REST que expõe as funcionalidades do sistema para o mundo exterior.
+*   **HomeOS.Api (C#)**: Interface REST que expõe as funcionalidades do sistema. Inclui configuração de CORS para integração com o frontend.
+*   **HomeOS.Client (TS/React)**: Frontend moderno construído com React 19, Vite e Tailwind CSS, focado em uma experiência de usuário premium.
 *   **HomeOS.Tests / IntegrationTests (C#)**: Suite de testes para garantir a integridade dos fluxos de negócio.
 
 ### Stack Tecnológica:
-- **Back-end**: .NET 8/9
-- **Linguagens**: C# e F#
+- **Back-end**: .NET 8/9, C#, F#
+- **Front-end**: React 19, Vite, TypeScript, Tailwind CSS
 - **Persistência**: SQL Server, Dapper, EF Core
-- **Mapeamento**: Manual (Mappers estáticos) para tradução eficiente entre F# Types e DbModels C#.
+- **Comunicação**: Axios (Frontend) para REST API (Backend)
 
 ## 3. Módulos e Funcionalidades Implementadas
 
 ### A. Core Financeiro (Transações)
-A gestão de transações é o coração do sistema e foi totalmente refatorada para garantir integridade contábil.
+A gestão de transações foi totalmente refatorada para suportar o ciclo de vida completo de uma despesa.
 
 - **Entidade de Domínio**: `Transaction` (F# Record).
-    - **Estados (Discriminated Union)**: `Pending`, `Paid` (com data), `Conciliated` (com data), `Cancelled` (com motivo).
-    - **Origem (TransactionSource)**: Define se a despesa saiu de uma Conta (`FromAccount`) ou de um Cartão de Crédito (`FromCreditCard`). Union Type que garante exclusividade mútua (XOR).
-- **Regras de Negócio**: 
-    - Validações de valores positivos.
-    - Impossibilidade de datas de pagamento futuras.
-    - Obrigatoriedade de vincular uma Categoria e uma Origem.
-- **API Endpoints**:
-    - `POST /api/transactions`: Cria despesas com validação robusta de origem.
-    - `GET /api/transactions`: Extrato com filtros de data.
-    - `GET /api/transactions/{id}`: Detalhes completos.
+- **Estados (Discriminated Union)**:
+    - `Pending`: Aguardando pagamento.
+    - `Paid`: Pago em uma data específica.
+    - `Conciliated`: Conciliado com o banco.
+    - `Cancelled`: Cancelado com motivação.
+- **Origem (TransactionSource)**: Define se a despesa saiu de uma Conta (`FromAccount`) ou de um Cartão de Crédito (`FromCreditCard`).
+- **Ações Implementadas**:
+    - `Create`: Criação com validação de origem (XOR entre Conta/Cartão).
+    - `Pay`: Marca como paga validando que não é uma data futura.
+    - `Cancel`: Cancela transações pendentes/pagas informando motivo.
+    - `Conciliate`: Finaliza o ciclo da transação.
+    - `Update`: Permite alteração de dados básicos enquanto não conciliada.
 
 ### B. Gestão de Cadastros (Auxiliares)
-Módulos de apoio implementados para suportar as transações:
+- **Categorias (`Categories`)**: Tipos Receita/Despesa com suporte a ícones.
+- **Contas (`Accounts`)**: Gestão de saldos iniciais e status ativo/inativo.
+- **Cartões de Crédito (`CreditCards`)**: Controle de limites e datas (fechamento/vencimento) validadas no domínio.
 
-1.  **Categorias (`Categories`)**
-    - Tipos: Receita ou Despesa.
-    - Suporte a Ícones (opcional).
-    - Endpoint: `/api/categories`.
+### C. Interface do Usuário (Frontend)
+- **Dashboard**: Visão geral financeira (em desenvolvimento).
+- **Gestão de Contas**: Listagem e criação de contas com design glassmorphism.
+- **Categorias e Cartões**: Interfaces dedicadas para manutenção de cadastros.
+- **Design System**: Paleta de cores premium (Dark Mode), tipografia Inter e micro-animações.
 
-2.  **Contas / Carteiras (`Accounts`)**
-    - Tipos: Corrente, Carteira (Dinheiro físico), Investimento.
-    - Controle de Saldo Inicial e Status (Ativo/Inativo).
-    - Endpoint: `/api/accounts`.
+## 4. Diferenciais da Implementação
 
-3.  **Cartões de Crédito (`CreditCards`)**
-    - Controle de Dia de Fechamento e Vencimento.
-    - Limite de crédito.
-    - Validação de dias (1-31) no domínio F#.
-    - Endpoint: `/api/credit-cards`.
-
-### C. Infraestrutura de Dados
-- **Schema Finance**: Organização das tabelas em um schema dedicado no SQL Server.
-- **Estratégia de Persistência**: Uso de `MERGE` (Upsert) no Dapper para simplificar a lógica de Salvar/Atualizar.
-- **Constraints de Banco**:
-    - `CK_Transaction_Source`: Garante no nível do banco que uma transação não pode ter AccountId e CreditCardId simultaneamente.
-- **Scripts**:
-    - `script/estrutura.sql`: Estrutura inicial.
-    - `script/database_update.sql`: Script de migração idempotente para atualizar bancos existentes com as novas estruturas.
-
-## 4. Diferenciais da Implementação Atual
-
-1.  **Segurança de Domínio (Type Safety Extreme)**: 
-    - O uso de F# impede a criação de objetos inválidos em memória.
-    - O uso de *Discriminated Unions* para `Status` e `Source` elimina a necessidade de flags booleanas confusas ou nulos excessivos.
-2.  **Performance Híbrida**: O repositório utiliza Dapper para consultas e escritas pesadas, permitindo o uso de recursos específicos do SQL Server que seriam mais complexos via ORM puro.
-3.  **API Limpa**: Controllers enxutos que declaram explicitamente seus contratos (Records DTOs).
+1.  **Segurança de Domínio**: O uso de F# impede a criação de estados inválidos (ex: uma transação paga sem data de pagamento).
+2.  **Performance**: Consultas otimizadas via Dapper com uso de comandos nativos SQL como `MERGE`.
+3.  **UI/UX Premium**: Foco em estética moderna sem comprometer a usabilidade.
 
 ---
-*Documentação atualizada em 2025-12-21*
+*Documentação atualizada em 2025-12-22*

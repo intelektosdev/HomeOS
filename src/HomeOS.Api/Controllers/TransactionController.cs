@@ -1,20 +1,35 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using HomeOS.Domain.FinancialTypes;
 using HomeOS.Infra.Repositories;
-using HomeOS.Api.Contracts; // Importando os DTOs
+using HomeOS.Api.Contracts;
+using System.Security.Claims;
 
 namespace HomeOS.Api.Controllers;
 
 [ApiController]
 [Route("api/transactions")]
+[Authorize]
 public class TransactionController(TransactionRepository repository) : ControllerBase
 {
     private readonly TransactionRepository _repository = repository;
+
+    private Guid GetCurrentUserId()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim == null || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            throw new UnauthorizedAccessException("User ID not found in token");
+        }
+        return userId;
+    }
 
     // 1. POST: Agora recebe um JSON no Body ([FromBody])
     [HttpPost]
     public IActionResult CreateExpense([FromBody] CreateTransactionRequest request)
     {
+        var userId = GetCurrentUserId();
+
         // Validação: Ou AccountId ou CreditCardId, nunca ambos ou nenhum
         if ((request.AccountId.HasValue && request.CreditCardId.HasValue) ||
             (!request.AccountId.HasValue && !request.CreditCardId.HasValue))
@@ -49,7 +64,7 @@ public class TransactionController(TransactionRepository repository) : Controlle
 
         var transaction = result.ResultValue;
 
-        _repository.Save(transaction);
+        _repository.Save(transaction, userId);
 
         return CreatedAtAction(nameof(GetById), new { id = transaction.Id }, MapToResponse(transaction));
     }
@@ -58,11 +73,13 @@ public class TransactionController(TransactionRepository repository) : Controlle
     [HttpGet]
     public IActionResult GetStatement([FromQuery] DateTime? start, [FromQuery] DateTime? end)
     {
+        var userId = GetCurrentUserId();
+
         // Padrão: Mês atual se não passar data
         var startDate = start ?? new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
         var endDate = end ?? startDate.AddMonths(1).AddDays(-1);
 
-        var transactions = _repository.GetStatement(startDate, endDate);
+        var transactions = _repository.GetStatement(startDate, endDate, userId);
 
         // Map dynamic results to proper DTOs
         var response = transactions.Select(t => new
@@ -84,7 +101,8 @@ public class TransactionController(TransactionRepository repository) : Controlle
     [HttpGet("{id}")]
     public IActionResult GetById(Guid id)
     {
-        var transaction = _repository.GetById(id);
+        var userId = GetCurrentUserId();
+        var transaction = _repository.GetById(id, userId);
         if (transaction == null) return NotFound();
 
         // Mapeamento simples para retorno
@@ -103,7 +121,8 @@ public class TransactionController(TransactionRepository repository) : Controlle
     [HttpPut("{id}")]
     public IActionResult Update(Guid id, [FromBody] UpdateTransactionRequest request)
     {
-        var transaction = _repository.GetById(id);
+        var userId = GetCurrentUserId();
+        var transaction = _repository.GetById(id, userId);
         if (transaction == null) return NotFound();
 
         if ((request.AccountId.HasValue && request.CreditCardId.HasValue) ||
@@ -137,7 +156,7 @@ public class TransactionController(TransactionRepository repository) : Controlle
         }
 
         var updatedTransaction = result.ResultValue;
-        _repository.Save(updatedTransaction);
+        _repository.Save(updatedTransaction, userId);
 
         return Ok(MapToResponse(updatedTransaction));
     }
@@ -146,7 +165,8 @@ public class TransactionController(TransactionRepository repository) : Controlle
     [HttpPost("{id}/cancel")]
     public IActionResult Cancel(Guid id, [FromBody] CancelTransactionRequest request)
     {
-        var transaction = _repository.GetById(id);
+        var userId = GetCurrentUserId();
+        var transaction = _repository.GetById(id, userId);
         if (transaction == null) return NotFound();
 
         var result = TransactionModule.cancel(transaction, request.Reason);
@@ -157,7 +177,7 @@ public class TransactionController(TransactionRepository repository) : Controlle
         }
 
         var updatedTransaction = result.ResultValue;
-        _repository.Save(updatedTransaction);
+        _repository.Save(updatedTransaction, userId);
 
         return Ok(MapToResponse(updatedTransaction));
     }
@@ -166,7 +186,8 @@ public class TransactionController(TransactionRepository repository) : Controlle
     [HttpPost("{id}/pay")]
     public IActionResult Pay(Guid id, [FromBody] PayTransactionRequest request)
     {
-        var existing = _repository.GetById(id);
+        var userId = GetCurrentUserId();
+        var existing = _repository.GetById(id, userId);
         if (existing == null) return NotFound();
 
         var paymentDate = request.PaymentDate ?? DateTime.Now;
@@ -178,7 +199,7 @@ public class TransactionController(TransactionRepository repository) : Controlle
         }
 
         var updatedTransaction = result.ResultValue;
-        _repository.Save(updatedTransaction);
+        _repository.Save(updatedTransaction, userId);
 
         return Ok(MapToResponse(updatedTransaction));
     }
@@ -187,7 +208,8 @@ public class TransactionController(TransactionRepository repository) : Controlle
     [HttpPost("{id}/conciliate")]
     public IActionResult Conciliate(Guid id, [FromBody] ConciliateTransactionRequest request)
     {
-        var existing = _repository.GetById(id);
+        var userId = GetCurrentUserId();
+        var existing = _repository.GetById(id, userId);
         if (existing == null) return NotFound();
 
         var conciliatedAt = request.ConciliatedAt ?? DateTime.Now;
@@ -199,7 +221,7 @@ public class TransactionController(TransactionRepository repository) : Controlle
         }
 
         var updatedTransaction = result.ResultValue;
-        _repository.Save(updatedTransaction);
+        _repository.Save(updatedTransaction, userId);
 
         return Ok(MapToResponse(updatedTransaction));
     }

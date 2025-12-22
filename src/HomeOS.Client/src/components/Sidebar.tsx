@@ -1,7 +1,17 @@
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import './Sidebar.css';
 
 export function Sidebar() {
+    const { user, logout } = useAuth();
+
+    const handleLogout = () => {
+        if (confirm('Deseja realmente sair?')) {
+            logout();
+            window.location.href = '/login';
+        }
+    };
+
     return (
         <aside className="sidebar">
             <div className="sidebar-header">
@@ -10,6 +20,22 @@ export function Sidebar() {
                     HomeOS
                 </h2>
                 <p className="sidebar-subtitle">Gestão Financeira</p>
+                {user && (
+                    <div style={{
+                        marginTop: '1rem',
+                        padding: '0.75rem',
+                        background: 'rgba(99, 102, 241, 0.1)',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: '0.875rem'
+                    }}>
+                        <div style={{ color: 'var(--color-text-secondary)', marginBottom: '0.25rem' }}>
+                            {user.name}
+                        </div>
+                        <div style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
+                            {user.email}
+                        </div>
+                    </div>
+                )}
             </div>
 
             <nav className="sidebar-nav">
@@ -44,6 +70,22 @@ export function Sidebar() {
                         <span className="nav-icon">💸</span>
                         <span className="nav-label">Transações</span>
                     </NavLink>
+                </div>
+
+                <div className="nav-section" style={{ marginTop: 'auto' }}>
+                    <button
+                        onClick={handleLogout}
+                        className="nav-item"
+                        style={{
+                            width: '100%',
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            border: 'none',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <span className="nav-icon">🚪</span>
+                        <span className="nav-label">Sair</span>
+                    </button>
                 </div>
             </nav>
         </aside>

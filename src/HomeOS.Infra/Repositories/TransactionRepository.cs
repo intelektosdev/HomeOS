@@ -15,17 +15,18 @@ public class TransactionRepository(IConfiguration configuration)
                             ?? throw new Exception("ConnectionString não encontrada");
 
     // Método para SALVAR (INSERT/UPDATE)
-    public void Save(Transaction transaction)
+    public void Save(Transaction transaction, Guid userId)
     {
         // 1. Converte F# -> POCO
         var dbModel = TransactionMapper.ToDb(transaction);
+        dbModel.UserId = userId; // Associ automatically with user
 
         // 2. Define o SQL na mão (Controle total!)
         // Note que estou usando MERGE (Upsert) ou poderia fazer um IF EXISTS
         const string sql = @"
             MERGE INTO [Finance].[Transactions] AS Target
             USING (SELECT @Id AS Id) AS Source
-            ON (Target.Id = Source.Id)
+            ON (Target.Id = Source.Id AND Target.UserId = @UserId)
             WHEN MATCHED THEN
                 UPDATE SET 
                     Description = @Description,
@@ -34,7 +35,7 @@ public class TransactionRepository(IConfiguration configuration)
                     StatusId = @StatusId,
                     PaymentDate = @PaymentDate,
                     ConciliatedDate = @ConciliatedDate,
-                    CancellationReason = @CancellationReason,
+                    CancellationReason = @ CancellationReason,
                     CategoryId = @CategoryId,
                     AccountId = @AccountId,
                     CreditCardId = @CreditCardId
@@ -51,7 +52,7 @@ public class TransactionRepository(IConfiguration configuration)
     }
 
     // Método para BUSCAR POR ID
-    public Transaction? GetById(Guid id)
+    public Transaction? GetById(Guid id, Guid userId)
     {
         const string sql = @"
             SELECT 
@@ -59,12 +60,12 @@ public class TransactionRepository(IConfiguration configuration)
                 StatusId, PaymentDate, ConciliatedDate, CancellationReason,
                 CategoryId, AccountId, CreditCardId
             FROM [Finance].[Transactions]
-            WHERE Id = @Id";
+            WHERE Id = @Id AND UserId = @UserId";
 
         using var connection = new SqlConnection(_connectionString);
 
         // Dapper preenche o POCO
-        var dbModel = connection.QuerySingleOrDefault<TransactionDbModel>(sql, new { Id = id });
+        var dbModel = connection.QuerySingleOrDefault<TransactionDbModel>(sql, new { Id = id, UserId = userId });
 
         if (dbModel == null) return null;
 
@@ -73,7 +74,7 @@ public class TransactionRepository(IConfiguration configuration)
 
     }
 
-    public IEnumerable<dynamic> GetStatement(DateTime startDate, DateTime endDate)
+    public IEnumerable<dynamic> GetStatement(DateTime startDate, DateTime endDate, Guid userId)
     {
         const string sql = @"
         SELECT 
@@ -91,12 +92,12 @@ public class TransactionRepository(IConfiguration configuration)
                 WHEN StatusId = 4 THEN 'Cancelled'
             END as Status
         FROM [Finance].[Transactions]
-        WHERE DueDate BETWEEN @StartDate AND @EndDate
+        WHERE DueDate BETWEEN @StartDate AND @EndDate AND UserId = @UserId
         ORDER BY DueDate ASC";
 
         using var connection = new SqlConnection(_connectionString);
 
         // Retornamos dynamic ou criamos uma classe específica de leitura (ReadModel)
-        return connection.Query(sql, new { StartDate = startDate, EndDate = endDate });
+        return connection.Query(sql, new { StartDate = startDate, EndDate = endDate, UserId = userId });
     }
 }

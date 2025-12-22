@@ -14,14 +14,15 @@ public class AccountRepository(IConfiguration configuration)
     private readonly string _connectionString = configuration.GetConnectionString("DefaultConnection")
                             ?? throw new Exception("ConnectionString não encontrada");
 
-    public void Save(Account account)
+    public void Save(Account account, Guid userId)
     {
         var dbModel = AccountMapper.ToDb(account);
+        dbModel.UserId = userId;
 
         const string sql = @"
             MERGE INTO [Finance].[Accounts] AS Target
             USING (SELECT @Id AS Id) AS Source
-            ON (Target.Id = Source.Id)
+            ON (Target.Id = Source.Id AND Target.UserId = @UserId)
             WHEN MATCHED THEN
                 UPDATE SET 
                     Name = @Name,
@@ -37,20 +38,20 @@ public class AccountRepository(IConfiguration configuration)
         connection.Execute(sql, dbModel);
     }
 
-    public Account? GetById(Guid id)
+    public Account? GetById(Guid id, Guid userId)
     {
-        const string sql = "SELECT * FROM [Finance].[Accounts] WHERE Id = @Id";
+        const string sql = "SELECT * FROM [Finance].[Accounts] WHERE Id = @Id AND UserId = @UserId";
         using var connection = new SqlConnection(_connectionString);
-        var dbModel = connection.QuerySingleOrDefault<AccountDbModel>(sql, new { Id = id });
+        var dbModel = connection.QuerySingleOrDefault<AccountDbModel>(sql, new { Id = id, UserId = userId });
 
         return dbModel == null ? null : AccountMapper.ToDomain(dbModel);
     }
 
-    public IEnumerable<Account> GetAll()
+    public IEnumerable<Account> GetAll(Guid userId)
     {
-        const string sql = "SELECT * FROM [Finance].[Accounts]";
+        const string sql = "SELECT * FROM [Finance].[Accounts] WHERE UserId = @UserId";
         using var connection = new SqlConnection(_connectionString);
-        var dbModels = connection.Query<AccountDbModel>(sql);
+        var dbModels = connection.Query<AccountDbModel>(sql, new { UserId = userId });
 
         return dbModels.Select(AccountMapper.ToDomain);
     }

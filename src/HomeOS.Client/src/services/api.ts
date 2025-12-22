@@ -21,6 +21,31 @@ export const api = axios.create({
     },
 });
 
+// Add authentication interceptor
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
+// Auth Service
+export const AuthService = {
+    login: async (email: string, password: string) => {
+        const response = await api.post('/auth/login', { email, password });
+        return response.data;
+    },
+    register: async (email: string, password: string, name: string) => {
+        const response = await api.post('/auth/register', { email, password, name });
+        return response.data;
+    },
+    getCurrentUser: async () => {
+        const response = await api.get('/auth/me');
+        return response.data;
+    }
+};
+
 export const CategoriesService = {
     getAll: async () => {
         const response = await api.get<CategoryResponse[]>('/categories');

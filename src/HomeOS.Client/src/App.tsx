@@ -1,26 +1,99 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './pages/Dashboard';
 import { Categories } from './pages/Categories';
 import { Accounts } from './pages/Accounts';
 import { CreditCards } from './pages/CreditCards';
 import { Transactions } from './pages/Transactions';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
+
+// Protected Route Component
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+// Layout with Sidebar (only for authenticated routes)
+function MainLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="app-layout">
+      <Sidebar />
+      <main className="main-content">
+        {children}
+      </main>
+    </div>
+  );
+}
 
 function App() {
   return (
     <BrowserRouter>
-      <div className="app-layout">
-        <Sidebar />
-        <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/categories" element={<Categories />} />
-            <Route path="/accounts" element={<Accounts />} />
-            <Route path="/credit-cards" element={<CreditCards />} />
-            <Route path="/transactions" element={<Transactions />} />
-          </Routes>
-        </main>
-      </div>
+      <AuthProvider>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+          {/* Protected routes */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Dashboard />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/categories"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Categories />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/accounts"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Accounts />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/credit-cards"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <CreditCards />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/transactions"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Transactions />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

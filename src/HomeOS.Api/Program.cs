@@ -1,13 +1,23 @@
 using HomeOS.Infra.Repositories;
+using HomeOS.Api.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Apenas registramos o Repositório. 
-// Ele mesmo lê a ConnectionString por dentro.
+// Register Repositories
 builder.Services.AddScoped<TransactionRepository>();
 builder.Services.AddScoped<CategoryRepository>();
 builder.Services.AddScoped<AccountRepository>();
 builder.Services.AddScoped<CreditCardRepository>();
+builder.Services.AddScoped<UserRepository>();
+
+// Register Services
+builder.Services.AddScoped<JwtService>();
+
+// Add HttpContextAccessor for getting current user in controllers
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddControllers();
 
@@ -15,13 +25,38 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Configurar CORS
+// Configure CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
         policy => policy.AllowAnyOrigin()
                         .AllowAnyHeader()
                         .AllowAnyMethod());
+});
+
+// Configure JWT Authentication
+var jwtSecret = builder.Configuration["Jwt:Secret"] ?? "your-super-secret-key-change-this-in-production-min-32-chars";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "HomeOS";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "HomeOS";
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+        ValidateIssuer = true,
+        ValidIssuer = jwtIssuer,
+        ValidateAudience = true,
+        ValidAudience = jwtAudience,
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.Zero
+    };
 });
 
 var app = builder.Build();
@@ -37,6 +72,8 @@ if (app.Environment.IsDevelopment())
 
 // app.UseHttpsRedirection();
 
+// IMPORTANT: Authentication must come before Authorization
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

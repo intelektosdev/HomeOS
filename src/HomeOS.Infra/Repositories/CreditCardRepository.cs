@@ -14,14 +14,15 @@ public class CreditCardRepository(IConfiguration configuration)
     private readonly string _connectionString = configuration.GetConnectionString("DefaultConnection")
                             ?? throw new Exception("ConnectionString não encontrada");
 
-    public void Save(CreditCard card)
+    public void Save(CreditCard card, Guid userId)
     {
         var dbModel = CreditCardMapper.ToDb(card);
+        dbModel.UserId = userId;
 
         const string sql = @"
             MERGE INTO [Finance].[CreditCards] AS Target
             USING (SELECT @Id AS Id) AS Source
-            ON (Target.Id = Source.Id)
+            ON (Target.Id = Source.Id AND Target.UserId = @UserId)
             WHEN MATCHED THEN
                 UPDATE SET 
                     Name = @Name,
@@ -37,20 +38,20 @@ public class CreditCardRepository(IConfiguration configuration)
         connection.Execute(sql, dbModel);
     }
 
-    public CreditCard? GetById(Guid id)
+    public CreditCard? GetById(Guid id, Guid userId)
     {
-        const string sql = "SELECT * FROM [Finance].[CreditCards] WHERE Id = @Id";
+        const string sql = "SELECT * FROM [Finance].[CreditCards] WHERE Id = @Id AND UserId = @UserId";
         using var connection = new SqlConnection(_connectionString);
-        var dbModel = connection.QuerySingleOrDefault<CreditCardDbModel>(sql, new { Id = id });
+        var dbModel = connection.QuerySingleOrDefault<CreditCardDbModel>(sql, new { Id = id, UserId = userId });
 
         return dbModel == null ? null : CreditCardMapper.ToDomain(dbModel);
     }
 
-    public IEnumerable<CreditCard> GetAll()
+    public IEnumerable<CreditCard> GetAll(Guid userId)
     {
-        const string sql = "SELECT * FROM [Finance].[CreditCards]";
+        const string sql = "SELECT * FROM [Finance].[CreditCards] WHERE UserId = @UserId";
         using var connection = new SqlConnection(_connectionString);
-        var dbModels = connection.Query<CreditCardDbModel>(sql);
+        var dbModels = connection.Query<CreditCardDbModel>(sql, new { UserId = userId });
 
         return dbModels.Select(CreditCardMapper.ToDomain);
     }

@@ -1,19 +1,34 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using HomeOS.Domain.FinancialTypes;
 using HomeOS.Infra.Repositories;
 using HomeOS.Api.Contracts;
+using System.Security.Claims;
 
 namespace HomeOS.Api.Controllers;
 
 [ApiController]
 [Route("api/accounts")]
+[Authorize]
 public class AccountController(AccountRepository repository) : ControllerBase
 {
     private readonly AccountRepository _repository = repository;
 
+    private Guid GetCurrentUserId()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim == null || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            throw new UnauthorizedAccessException("User ID not found in token");
+        }
+        return userId;
+    }
+
     [HttpPost]
     public IActionResult Create([FromBody] CreateAccountRequest request)
     {
+        var userId = GetCurrentUserId();
+
         AccountType type = request.Type.ToLower() switch
         {
             "checking" => AccountType.Checking,
@@ -24,7 +39,7 @@ public class AccountController(AccountRepository repository) : ControllerBase
 
         var account = AccountModule.create(request.Name, type, request.InitialBalance);
 
-        _repository.Save(account);
+        _repository.Save(account, userId);
 
         var response = new AccountResponse(
             account.Id,
@@ -40,7 +55,8 @@ public class AccountController(AccountRepository repository) : ControllerBase
     [HttpGet("{id}")]
     public IActionResult GetById(Guid id)
     {
-        var account = _repository.GetById(id);
+        var userId = GetCurrentUserId();
+        var account = _repository.GetById(id, userId);
         if (account == null) return NotFound();
 
         var response = new AccountResponse(
@@ -57,7 +73,8 @@ public class AccountController(AccountRepository repository) : ControllerBase
     [HttpGet]
     public IActionResult GetAll()
     {
-        var accounts = _repository.GetAll();
+        var userId = GetCurrentUserId();
+        var accounts = _repository.GetAll(userId);
         var response = accounts.Select(a => new AccountResponse(
             a.Id,
             a.Name,
@@ -72,12 +89,13 @@ public class AccountController(AccountRepository repository) : ControllerBase
     [HttpPatch("{id}/toggle-status")]
     public IActionResult ToggleStatus(Guid id)
     {
-        var account = _repository.GetById(id);
+        var userId = GetCurrentUserId();
+        var account = _repository.GetById(id, userId);
         if (account == null) return NotFound();
 
         // Toggle the IsActive status
         var updatedAccount = AccountModule.toggleActive(account);
-        _repository.Save(updatedAccount);
+        _repository.Save(updatedAccount, userId);
 
         var response = new AccountResponse(
             updatedAccount.Id,

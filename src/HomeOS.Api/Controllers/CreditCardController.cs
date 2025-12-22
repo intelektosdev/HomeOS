@@ -1,19 +1,34 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using HomeOS.Domain.FinancialTypes;
 using HomeOS.Infra.Repositories;
 using HomeOS.Api.Contracts;
+using System.Security.Claims;
 
 namespace HomeOS.Api.Controllers;
 
 [ApiController]
 [Route("api/credit-cards")]
+[Authorize]
 public class CreditCardController(CreditCardRepository repository) : ControllerBase
 {
     private readonly CreditCardRepository _repository = repository;
 
+    private Guid GetCurrentUserId()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim == null || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            throw new UnauthorizedAccessException("User ID not found in token");
+        }
+        return userId;
+    }
+
     [HttpPost]
     public IActionResult Create([FromBody] CreateCreditCardRequest request)
     {
+        var userId = GetCurrentUserId();
+
         var result = CreditCardModule.create(
             request.Name,
             request.ClosingDay,
@@ -27,7 +42,7 @@ public class CreditCardController(CreditCardRepository repository) : ControllerB
         }
 
         var card = result.ResultValue;
-        _repository.Save(card);
+        _repository.Save(card, userId);
 
         var response = new CreditCardResponse(
             card.Id,
@@ -43,7 +58,8 @@ public class CreditCardController(CreditCardRepository repository) : ControllerB
     [HttpGet("{id}")]
     public IActionResult GetById(Guid id)
     {
-        var card = _repository.GetById(id);
+        var userId = GetCurrentUserId();
+        var card = _repository.GetById(id, userId);
         if (card == null) return NotFound();
 
         var response = new CreditCardResponse(
@@ -60,7 +76,8 @@ public class CreditCardController(CreditCardRepository repository) : ControllerB
     [HttpGet]
     public IActionResult GetAll()
     {
-        var cards = _repository.GetAll();
+        var userId = GetCurrentUserId();
+        var cards = _repository.GetAll(userId);
         var response = cards.Select(c => new CreditCardResponse(
             c.Id,
             c.Name,

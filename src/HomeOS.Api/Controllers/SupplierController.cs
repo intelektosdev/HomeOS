@@ -80,6 +80,28 @@ public class SupplierController : ControllerBase
 
         return CreatedAtAction(nameof(GetById), new { id = supplier.Id }, new { supplier.Id });
     }
+    [HttpPut("{id}")]
+    public IActionResult Update(Guid id, [FromBody] UpdateSupplierRequest request)
+    {
+        var userId = GetCurrentUserId();
+        var existing = _repository.GetById(id, userId);
+        if (existing == null) return NotFound();
+
+        var email = !string.IsNullOrEmpty(request.Email)
+            ? Microsoft.FSharp.Core.FSharpOption<string>.Some(request.Email)
+            : Microsoft.FSharp.Core.FSharpOption<string>.None;
+
+        var phone = !string.IsNullOrEmpty(request.Phone)
+            ? Microsoft.FSharp.Core.FSharpOption<string>.Some(request.Phone)
+            : Microsoft.FSharp.Core.FSharpOption<string>.None;
+
+        var supplier = SupplierModule.update(existing, request.Name, email, phone);
+
+        _repository.Save(supplier, userId);
+
+        return Ok(new { supplier.Id });
+    }
 }
 
 public record CreateSupplierRequest(string Name, string? Email, string? Phone);
+public record UpdateSupplierRequest(string Name, string? Email, string? Phone);

@@ -36,10 +36,17 @@ public record AccountResponse(
 // --- CREDIT CARDS ---
 
 public record CreateCreditCardRequest(
-    [Required] string Name,
-    [Range(1, 31)] int ClosingDay,
-    [Range(1, 31)] int DueDay,
-    [Range(0, double.MaxValue)] decimal Limit
+    string Name,
+    int ClosingDay,
+    int DueDay,
+    decimal Limit
+);
+
+public record UpdateCreditCardRequest(
+    string Name,
+    int ClosingDay,
+    int DueDay,
+    decimal Limit
 );
 
 public record CreditCardResponse(

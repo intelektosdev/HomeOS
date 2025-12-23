@@ -15,6 +15,7 @@ export function CreditCards() {
         dueDay: 10,
         limit: 0
     });
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     const loadCreditCards = async () => {
         try {
@@ -34,13 +35,33 @@ export function CreditCards() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await CreditCardsService.create(formData);
-            setFormData({ name: '', closingDay: 1, dueDay: 10, limit: 0 });
-            setShowForm(false);
+            if (editingId) {
+                await CreditCardsService.update(editingId, formData);
+            } else {
+                await CreditCardsService.create(formData);
+            }
+            resetForm();
             loadCreditCards();
         } catch (error) {
-            console.error('Erro ao criar cartão', error);
+            console.error('Erro ao salvar cartão', error);
         }
+    };
+
+    const resetForm = () => {
+        setFormData({ name: '', closingDay: 1, dueDay: 10, limit: 0 });
+        setEditingId(null);
+        setShowForm(false);
+    };
+
+    const handleEdit = (card: CreditCardResponse) => {
+        setFormData({
+            name: card.name,
+            closingDay: card.closingDay,
+            dueDay: card.dueDay,
+            limit: card.limit
+        });
+        setEditingId(card.id);
+        setShowForm(true);
     };
 
     if (loading) return <div className="page"><div className="loading">Carregando...</div></div>;
@@ -82,7 +103,7 @@ export function CreditCards() {
 
             {showForm && (
                 <div className="glass-panel" style={{ marginBottom: '2rem' }}>
-                    <h3 style={{ marginBottom: '1.5rem' }}>Novo Cartão de Crédito</h3>
+                    <h3 style={{ marginBottom: '1.5rem' }}>{editingId ? 'Editar Cartão' : 'Novo Cartão'}</h3>
                     <form onSubmit={handleSubmit} className="form">
                         <div className="form-row">
                             <div className="form-group" style={{ flex: 2 }}>
@@ -138,7 +159,7 @@ export function CreditCards() {
                         </div>
 
                         <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>
-                            Salvar Cartão
+                            {editingId ? 'Salvar Alterações' : 'Salvar Cartão'}
                         </button>
                     </form>
                 </div>
@@ -171,6 +192,17 @@ export function CreditCards() {
                                     <span className="limit-label">Limite disponível</span>
                                     <span className="limit-value">R$ {card.limit.toFixed(2)}</span>
                                 </div>
+
+                                <div className="card-actions" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+                                    <button
+                                        className="btn-icon"
+                                        title="Editar"
+                                        onClick={() => handleEdit(card)}
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                                    >
+                                        ✏️
+                                    </button>
+                                </div>
                             </div>
                         ))
                     )}
@@ -187,6 +219,7 @@ export function CreditCards() {
                                     <th>Fechamento</th>
                                     <th>Vencimento</th>
                                     <th>Limite</th>
+                                    <th>Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -206,6 +239,16 @@ export function CreditCards() {
                                         </td>
                                         <td>
                                             <span className="amount-value">R$ {card.limit.toFixed(2)}</span>
+                                        </td>
+                                        <td>
+                                            <button
+                                                className="btn-icon"
+                                                title="Editar"
+                                                onClick={() => handleEdit(card)}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                                            >
+                                                ✏️
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}

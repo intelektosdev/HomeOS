@@ -74,10 +74,17 @@ Módulo completo para gestão de estoque doméstico e compras.
 
 ### E. Melhorias de UI/UX
 - **Visualização Híbrida (Grid/Cards)**:
-    - Implementada alternância entre modo Grade (Cards visuais) e Tabela para: Produtos, Grupos de Produtos, Fornecedores e Contas.
+    - Implementada alternância entre modo Grade (Cards visuais) e Tabela para: Produtos, Grupos de Produtos, Fornecedores, Contas e Cartões de Crédito.
     - Design consistente seguindo o padrão Glassmorphism.
 - **Padronização**:
     - Cards de "Contas", "Grupos" e "Fornecedores" unificados visualmente (Ícone + Header + Ações).
 
+### F. Funcionalidades de Edição (CRUD Completo)
+- **Grupos de Produtos**: Botão "Editar" nas visualizações Cards e Grid, com endpoint `PUT /api/product-groups/{id}`.
+- **Fornecedores**: Botão "Editar" nas visualizações Cards e Grid, com endpoint `PUT /api/suppliers/{id}`.
+- **Cartões de Crédito**: Botão "Editar" nas visualizações Cards e Grid, com endpoint `PUT /api/credit-cards/{id}` e lógica de validação em F# (`CreditCardModule.update`).
+- **Transações**: Seleção de Cartão de Crédito como origem de pagamento corrigida e funcional.
+
 ---
 *Documentação atualizada em 2025-12-23*
+

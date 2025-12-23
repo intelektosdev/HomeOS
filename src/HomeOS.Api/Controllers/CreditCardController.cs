@@ -55,6 +55,33 @@ public class CreditCardController(CreditCardRepository repository) : ControllerB
         return CreatedAtAction(nameof(GetById), new { id = card.Id }, response);
     }
 
+    [HttpPut("{id}")]
+    public IActionResult Update(Guid id, [FromBody] UpdateCreditCardRequest request)
+    {
+        var userId = GetCurrentUserId();
+        var existingCard = _repository.GetById(id, userId);
+
+        if (existingCard == null) return NotFound();
+
+        var result = CreditCardModule.update(
+            existingCard,
+            request.Name,
+            request.ClosingDay,
+            request.DueDay,
+            request.Limit
+        );
+
+        if (result.IsError)
+        {
+            return BadRequest(new { error = result.ErrorValue.ToString() });
+        }
+
+        var updatedCard = result.ResultValue;
+        _repository.Save(updatedCard, userId);
+
+        return NoContent();
+    }
+
     [HttpGet("{id}")]
     public IActionResult GetById(Guid id)
     {

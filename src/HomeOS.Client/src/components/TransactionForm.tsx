@@ -102,7 +102,9 @@ export function TransactionForm({ transaction, onSuccess, onCancel }: Transactio
 
     if (loading) return <div>Carregando formulário...</div>;
 
-    const isCreditCard = !!formData.creditCardId || (!formData.accountId && !formData.creditCardId && transaction?.creditCardId);
+    // Credit Card mode is active when accountId is explicitly undefined (user clicked Credit Card button)
+    // OR when creditCardId has a value, OR when editing a transaction that was originally from credit card
+    const isCreditCard = formData.accountId === undefined || !!formData.creditCardId || (!formData.accountId && !formData.creditCardId && transaction?.creditCardId);
 
     return (
         <div className="glass-panel" style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>

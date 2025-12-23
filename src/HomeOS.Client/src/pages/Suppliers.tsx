@@ -6,6 +6,7 @@ export function Suppliers() {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [formData, setFormData] = useState({ name: '', email: '', phone: '' });
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     const [viewMode, setViewMode] = useState<'cards' | 'grid'>('grid');
 
@@ -27,13 +28,28 @@ export function Suppliers() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await SuppliersService.create(formData);
-            setFormData({ name: '', email: '', phone: '' });
-            setShowForm(false);
+            if (editingId) {
+                await SuppliersService.update(editingId, formData);
+            } else {
+                await SuppliersService.create(formData);
+            }
+            resetForm();
             loadData();
         } catch (error) {
             console.error('Erro ao salvar fornecedor', error);
         }
+    };
+
+    const resetForm = () => {
+        setFormData({ name: '', email: '', phone: '' });
+        setEditingId(null);
+        setShowForm(false);
+    };
+
+    const handleEdit = (supplier: Supplier) => {
+        setFormData({ name: supplier.name, email: supplier.email || '', phone: supplier.phone || '' });
+        setEditingId(supplier.id);
+        setShowForm(true);
     };
 
     if (loading) return <div className="page"><div className="loading">Carregando...</div></div>;
@@ -64,7 +80,10 @@ export function Suppliers() {
                     </div>
                     <button
                         className="btn btn-primary"
-                        onClick={() => setShowForm(!showForm)}
+                        onClick={() => {
+                            if (showForm) resetForm();
+                            else setShowForm(true);
+                        }}
                     >
                         {showForm ? '✕ Cancelar' : '+ Novo Fornecedor'}
                     </button>
@@ -73,7 +92,8 @@ export function Suppliers() {
 
             {showForm && (
                 <div className="glass-panel" style={{ marginBottom: '2rem' }}>
-                    <h3 style={{ marginBottom: '1.5rem' }}>Novo Fornecedor</h3>
+
+                    <h3 style={{ marginBottom: '1.5rem' }}>{editingId ? 'Editar Fornecedor' : 'Novo Fornecedor'}</h3>
                     <form onSubmit={handleSubmit} className="form">
                         <div className="form-group">
                             <label className="form-label">Nome</label>
@@ -105,8 +125,9 @@ export function Suppliers() {
                                 placeholder="(00) 00000-0000"
                             />
                         </div>
+
                         <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>
-                            Salvar Fornecedor
+                            {editingId ? 'Salvar Alterações' : 'Salvar Fornecedor'}
                         </button>
                     </form>
                 </div>
@@ -160,6 +181,7 @@ export function Suppliers() {
                                             fontWeight: 600
                                         }}
                                         title="Editar"
+                                        onClick={() => handleEdit(supplier)}
                                     >
                                         ✏️ Editar
                                     </button>
@@ -179,6 +201,7 @@ export function Suppliers() {
                                     <th>Nome</th>
                                     <th>Email</th>
                                     <th>Telefone</th>
+                                    <th>Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -192,6 +215,16 @@ export function Suppliers() {
                                         </td>
                                         <td>{supplier.email || '-'}</td>
                                         <td>{supplier.phone || '-'}</td>
+                                        <td>
+                                            <button
+                                                className="btn-icon"
+                                                title="Editar"
+                                                onClick={() => handleEdit(supplier)}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                                            >
+                                                ✏️
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>

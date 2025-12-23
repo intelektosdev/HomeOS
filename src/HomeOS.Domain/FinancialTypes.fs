@@ -109,6 +109,27 @@ module CreditCardModule =
                   DueDay = dueDay
                   Limit = limit }
 
+    let update
+        (card: CreditCard)
+        (name: string)
+        (closingDay: int)
+        (dueDay: int)
+        (limit: Money)
+        : Result<CreditCard, CreditCardError> =
+        if closingDay < 1 || closingDay > 31 then
+            Error InvalidClosingDay
+        elif dueDay < 1 || dueDay > 31 then
+            Error InvalidDueDay
+        elif limit < 0m then
+            Error LimitMustBePositive
+        else
+            Ok
+                { card with
+                    Name = name
+                    ClosingDay = closingDay
+                    DueDay = dueDay
+                    Limit = limit }
+
 module TransactionModule =
 
     type DomainError =

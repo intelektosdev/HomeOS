@@ -87,7 +87,7 @@ module UnitOfMeasureModule =
         | "ml"
         | "milliliter"
         | "mililitro" -> Some Milliliter
-        | "mililitro" -> Some Milliliter
+
         | _ -> None
 
 module ProductGroupModule =
@@ -97,6 +97,11 @@ module ProductGroupModule =
           Description = description
           CreatedAt = DateTime.UtcNow }
 
+    let update (group: ProductGroup) (name: string) (description: string option) =
+        { group with
+            Name = name
+            Description = description }
+
 module SupplierModule =
     let create (name: string) (email: string option) (phone: string option) =
         { Id = Guid.NewGuid()
@@ -104,6 +109,12 @@ module SupplierModule =
           Email = email
           Phone = phone
           CreatedAt = DateTime.UtcNow }
+
+    let update (supplier: Supplier) (name: string) (email: string option) (phone: string option) =
+        { supplier with
+            Name = name
+            Email = email
+            Phone = phone }
 
 module ProductModule =
     type ProductError =

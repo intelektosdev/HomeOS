@@ -74,6 +74,24 @@ public class ProductGroupController : ControllerBase
 
         return CreatedAtAction(nameof(GetById), new { id = group.Id }, new { group.Id });
     }
+    [HttpPut("{id}")]
+    public IActionResult Update(Guid id, [FromBody] UpdateProductGroupRequest request)
+    {
+        var userId = GetCurrentUserId();
+        var existing = _repository.GetById(id, userId);
+        if (existing == null) return NotFound();
+
+        var description = !string.IsNullOrEmpty(request.Description)
+            ? Microsoft.FSharp.Core.FSharpOption<string>.Some(request.Description)
+            : Microsoft.FSharp.Core.FSharpOption<string>.None;
+
+        var group = ProductGroupModule.update(existing, request.Name, description);
+
+        _repository.Save(group, userId);
+
+        return Ok(new { group.Id });
+    }
 }
 
 public record CreateProductGroupRequest(string Name, string? Description);
+public record UpdateProductGroupRequest(string Name, string? Description);

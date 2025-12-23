@@ -26,8 +26,8 @@ BEGIN
         [Id] UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
         [UserId] UNIQUEIDENTIFIER NOT NULL,
         [Name] NVARCHAR(150) NOT NULL,
-        [CNPJ] NVARCHAR(18) NULL,
-        [Address] NVARCHAR(250) NULL,
+        [Email] NVARCHAR(150) NULL,
+        [Phone] NVARCHAR(20) NULL,
         [CreatedAt] DATETIME2 DEFAULT SYSUTCDATETIME(),
         
         CONSTRAINT FK_Suppliers_Users FOREIGN KEY ([UserId]) REFERENCES [Finance].[Users]([Id])

@@ -84,6 +84,10 @@ export const CreditCardsService = {
     create: async (data: CreateCreditCardRequest) => {
         const response = await api.post<CreditCardResponse>('/credit-cards', data);
         return response.data;
+    },
+    update: async (id: string, data: CreateCreditCardRequest) => {
+        const response = await api.put<CreditCardResponse>(`/credit-cards/${id}`, data);
+        return response.data;
     }
 };
 
@@ -261,6 +265,9 @@ export const ProductGroupsService = {
     create: async (data: { name: string; description?: string }) => {
         const response = await api.post<{ id: string }>('/product-groups', data);
         return response.data;
+    },
+    update: async (id: string, data: { name: string; description?: string }) => {
+        await api.put(`/product-groups/${id}`, data);
     }
 };
 
@@ -276,6 +283,9 @@ export const SuppliersService = {
     create: async (data: { name: string; email?: string; phone?: string }) => {
         const response = await api.post<{ id: string }>('/suppliers', data);
         return response.data;
+    },
+    update: async (id: string, data: { name: string; email?: string; phone?: string }) => {
+        await api.put(`/suppliers/${id}`, data);
     }
 };
 

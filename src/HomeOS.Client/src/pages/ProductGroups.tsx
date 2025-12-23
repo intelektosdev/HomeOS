@@ -6,6 +6,7 @@ export function ProductGroups() {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [formData, setFormData] = useState({ name: '', description: '' });
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     const [viewMode, setViewMode] = useState<'cards' | 'grid'>('grid');
 
@@ -27,13 +28,28 @@ export function ProductGroups() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await ProductGroupsService.create(formData);
-            setFormData({ name: '', description: '' });
-            setShowForm(false);
+            if (editingId) {
+                await ProductGroupsService.update(editingId, formData);
+            } else {
+                await ProductGroupsService.create(formData);
+            }
+            resetForm();
             loadData();
         } catch (error) {
             console.error('Erro ao salvar grupo', error);
         }
+    };
+
+    const resetForm = () => {
+        setFormData({ name: '', description: '' });
+        setEditingId(null);
+        setShowForm(false);
+    };
+
+    const handleEdit = (group: ProductGroup) => {
+        setFormData({ name: group.name, description: group.description || '' });
+        setEditingId(group.id);
+        setShowForm(true);
     };
 
     if (loading) return <div className="page"><div className="loading">Carregando...</div></div>;
@@ -64,7 +80,10 @@ export function ProductGroups() {
                     </div>
                     <button
                         className="btn btn-primary"
-                        onClick={() => setShowForm(!showForm)}
+                        onClick={() => {
+                            if (showForm) resetForm();
+                            else setShowForm(true);
+                        }}
                     >
                         {showForm ? '✕ Cancelar' : '+ Novo Grupo'}
                     </button>
@@ -73,7 +92,8 @@ export function ProductGroups() {
 
             {showForm && (
                 <div className="glass-panel" style={{ marginBottom: '2rem' }}>
-                    <h3 style={{ marginBottom: '1.5rem' }}>Novo Grupo</h3>
+
+                    <h3 style={{ marginBottom: '1.5rem' }}>{editingId ? 'Editar Grupo' : 'Novo Grupo'}</h3>
                     <form onSubmit={handleSubmit} className="form">
                         <div className="form-group">
                             <label className="form-label">Nome</label>
@@ -94,8 +114,9 @@ export function ProductGroups() {
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             />
                         </div>
+
                         <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>
-                            Salvar Grupo
+                            {editingId ? 'Salvar Alterações' : 'Salvar Grupo'}
                         </button>
                     </form>
                 </div>
@@ -132,6 +153,7 @@ export function ProductGroups() {
                                             fontWeight: 600
                                         }}
                                         title="Editar"
+                                        onClick={() => handleEdit(group)}
                                     >
                                         ✏️ Editar
                                     </button>
@@ -150,6 +172,7 @@ export function ProductGroups() {
                                 <tr>
                                     <th>Nome</th>
                                     <th>Descrição</th>
+                                    <th>Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -162,6 +185,16 @@ export function ProductGroups() {
                                             </div>
                                         </td>
                                         <td>{group.description || '-'}</td>
+                                        <td>
+                                            <button
+                                                className="btn-icon"
+                                                title="Editar"
+                                                onClick={() => handleEdit(group)}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                                            >
+                                                ✏️
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>

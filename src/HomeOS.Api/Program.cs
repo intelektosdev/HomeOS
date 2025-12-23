@@ -13,6 +13,13 @@ builder.Services.AddScoped<AccountRepository>();
 builder.Services.AddScoped<CreditCardRepository>();
 builder.Services.AddScoped<UserRepository>();
 
+// Inventory Repositories
+builder.Services.AddScoped<ProductRepository>();
+builder.Services.AddScoped<ProductGroupRepository>();
+builder.Services.AddScoped<SupplierRepository>();
+builder.Services.AddScoped<ShoppingListRepository>();
+builder.Services.AddScoped<PurchaseItemRepository>();
+
 // Register Services
 builder.Services.AddScoped<JwtService>();
 

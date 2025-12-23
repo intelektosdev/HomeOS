@@ -57,5 +57,27 @@ A gestão de transações foi totalmente refatorada para suportar o ciclo de vid
 2.  **Performance**: Consultas otimizadas via Dapper com uso de comandos nativos SQL como `MERGE`.
 3.  **UI/UX Premium**: Foco em estética moderna sem comprometer a usabilidade.
 
+### D. Sistema de Inventário (Novo)
+Módulo completo para gestão de estoque doméstico e compras.
+
+- **Domínio (F#)**:
+    - `Product`: Produto com unidade de medida, preço, estoque mínimo e código de barras.
+    - `Supplier`: Fornecedores com nome, email e telefone.
+    - `ShoppingList`: Lista de compras inteligente que calcula valor total e integra com transações.
+- **Funcionalidades**:
+    - **Produtos**: Cadastro completo, ajuste rápido de estoque (+1/-1), alerta de estoque baixo visual (Badge amarelo).
+    - **Grupos de Produtos**: Categorização para organização do estoque.
+    - **Fornecedores**: Gestão de contatos de compras.
+    - **Lista de Compras**:
+        - Adição de itens do estoque ou itens avulsos.
+        - **Finalização de Compra (Checkout)**: Gera automaticamente uma Transação Financeira (`Expense`) no valor total, permite criar produtos novos on-the-fly e atualiza o histórico.
+
+### E. Melhorias de UI/UX
+- **Visualização Híbrida (Grid/Cards)**:
+    - Implementada alternância entre modo Grade (Cards visuais) e Tabela para: Produtos, Grupos de Produtos, Fornecedores e Contas.
+    - Design consistente seguindo o padrão Glassmorphism.
+- **Padronização**:
+    - Cards de "Contas", "Grupos" e "Fornecedores" unificados visualmente (Ícone + Header + Ações).
+
 ---
-*Documentação atualizada em 2025-12-22*
+*Documentação atualizada em 2025-12-23*

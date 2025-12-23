@@ -35,7 +35,7 @@ public class TransactionRepository(IConfiguration configuration)
                     StatusId = @StatusId,
                     PaymentDate = @PaymentDate,
                     ConciliatedDate = @ConciliatedDate,
-                    CancellationReason = @ CancellationReason,
+                    CancellationReason = @CancellationReason,
                     CategoryId = @CategoryId,
                     AccountId = @AccountId,
                     CreditCardId = @CreditCardId

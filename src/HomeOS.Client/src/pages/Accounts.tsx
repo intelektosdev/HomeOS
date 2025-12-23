@@ -9,6 +9,7 @@ export function Accounts() {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [viewMode, setViewMode] = useState<ViewMode>('cards');
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState<CreateAccountRequest>({
         name: '',
         type: 'Checking',
@@ -33,13 +34,32 @@ export function Accounts() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await AccountsService.create(formData);
-            setFormData({ name: '', type: 'Checking', initialBalance: 0 });
-            setShowForm(false);
+            if (editingId) {
+                await AccountsService.update(editingId, formData);
+            } else {
+                await AccountsService.create(formData);
+            }
+            resetForm();
             loadAccounts();
         } catch (error) {
-            console.error('Erro ao criar conta', error);
+            console.error('Erro ao salvar conta', error);
         }
+    };
+
+    const resetForm = () => {
+        setFormData({ name: '', type: 'Checking', initialBalance: 0 });
+        setShowForm(false);
+        setEditingId(null);
+    };
+
+    const handleEdit = (account: AccountResponse) => {
+        setEditingId(account.id);
+        setFormData({
+            name: account.name,
+            type: account.type as AccountType,
+            initialBalance: account.initialBalance
+        });
+        setShowForm(true);
     };
 
     const handleToggleStatus = async (id: string) => {
@@ -99,7 +119,7 @@ export function Accounts() {
 
                     <button
                         className="btn btn-primary"
-                        onClick={() => setShowForm(!showForm)}
+                        onClick={() => { resetForm(); setShowForm(!showForm); }}
                     >
                         {showForm ? '✕ Cancelar' : '+ Nova Conta'}
                     </button>
@@ -108,7 +128,7 @@ export function Accounts() {
 
             {showForm && (
                 <div className="glass-panel" style={{ marginBottom: '2rem' }}>
-                    <h3 style={{ marginBottom: '1.5rem' }}>Nova Conta</h3>
+                    <h3 style={{ marginBottom: '1.5rem' }}>{editingId ? 'Editar Conta' : 'Nova Conta'}</h3>
                     <form onSubmit={handleSubmit} className="form">
                         <div className="form-row">
                             <div className="form-group" style={{ flex: 2 }}>
@@ -149,9 +169,16 @@ export function Accounts() {
                             </div>
                         </div>
 
-                        <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>
-                            Salvar Conta
-                        </button>
+                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                            <button type="submit" className="btn btn-primary">
+                                {editingId ? 'Atualizar' : 'Salvar'} Conta
+                            </button>
+                            {editingId && (
+                                <button type="button" className="btn btn-secondary" onClick={resetForm}>
+                                    Cancelar Edição
+                                </button>
+                            )}
+                        </div>
                     </form>
                 </div>
             )}
@@ -179,6 +206,13 @@ export function Accounts() {
                                     </span>
                                 </div>
                                 <div className="account-actions">
+                                    <button
+                                        className="btn-edit"
+                                        onClick={() => handleEdit(account)}
+                                        title="Editar conta"
+                                    >
+                                        ✏️ Editar
+                                    </button>
                                     <button
                                         className={`btn-toggle ${account.isActive ? 'btn-deactivate' : 'btn-activate'}`}
                                         onClick={() => handleToggleStatus(account.id)}
@@ -226,12 +260,21 @@ export function Accounts() {
                                             )}
                                         </td>
                                         <td>
-                                            <button
-                                                className={`btn-toggle-small ${account.isActive ? 'btn-deactivate' : 'btn-activate'}`}
-                                                onClick={() => handleToggleStatus(account.id)}
-                                            >
-                                                {account.isActive ? 'Desabilitar' : 'Habilitar'}
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <button
+                                                    className="btn-toggle-small"
+                                                    onClick={() => handleEdit(account)}
+                                                    title="Editar"
+                                                >
+                                                    ✏️
+                                                </button>
+                                                <button
+                                                    className={`btn-toggle-small ${account.isActive ? 'btn-deactivate' : 'btn-activate'}`}
+                                                    onClick={() => handleToggleStatus(account.id)}
+                                                >
+                                                    {account.isActive ? 'Desabilitar' : 'Habilitar'}
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

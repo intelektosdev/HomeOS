@@ -86,6 +86,35 @@ public class AccountController(AccountRepository repository) : ControllerBase
         return Ok(response);
     }
 
+    [HttpPut("{id}")]
+    public IActionResult Update(Guid id, [FromBody] CreateAccountRequest request)
+    {
+        var userId = GetCurrentUserId();
+        var existing = _repository.GetById(id, userId);
+        if (existing == null) return NotFound();
+
+        AccountType type = request.Type.ToLower() switch
+        {
+            "checking" => AccountType.Checking,
+            "wallet" => AccountType.Wallet,
+            "investment" => AccountType.Investment,
+            _ => AccountType.Checking
+        };
+
+        var updated = AccountModule.update(existing, request.Name, type, request.InitialBalance);
+        _repository.Save(updated, userId);
+
+        var response = new AccountResponse(
+            updated.Id,
+            updated.Name,
+            updated.Type.ToString(),
+            updated.InitialBalance,
+            updated.IsActive
+        );
+
+        return Ok(response);
+    }
+
     [HttpPatch("{id}/toggle-status")]
     public IActionResult ToggleStatus(Guid id)
     {

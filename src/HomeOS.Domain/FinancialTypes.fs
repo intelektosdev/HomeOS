@@ -82,6 +82,11 @@ module AccountModule =
         { account with
             IsActive = not account.IsActive }
 
+    let update (account: Account) (name: string) (accType: AccountType) (initialBalance: Money) =
+        { account with
+            Name = name
+            Type = accType
+            InitialBalance = initialBalance }
 
 module CreditCardModule =
     type CreditCardError =

@@ -167,7 +167,7 @@ export function Register() {
                         type="submit"
                         className="btn btn-primary"
                         style={{ width: '100%', marginTop: '1rem' }}
-                        disabled={loading || (confirmPassword && password !== confirmPassword)}
+                        disabled={loading || (confirmPassword !== '' && password !== confirmPassword)}
                     >
                         {loading ? 'Criando conta...' : 'Registrar'}
                     </button>

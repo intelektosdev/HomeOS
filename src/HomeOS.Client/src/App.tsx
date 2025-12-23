@@ -8,6 +8,10 @@ import { CreditCards } from './pages/CreditCards';
 import { Transactions } from './pages/Transactions';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { Products } from './pages/Products';
+import { ShoppingList } from './pages/ShoppingList';
+import { ProductGroups } from './pages/ProductGroups';
+import { Suppliers } from './pages/Suppliers';
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -88,6 +92,46 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Transactions />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/products"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Products />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/shopping-list"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ShoppingList />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/product-groups"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ProductGroups />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/suppliers"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Suppliers />
                 </MainLayout>
               </ProtectedRoute>
             }

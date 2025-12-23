@@ -61,6 +61,15 @@ export function Sidebar() {
                         <span className="nav-icon">💳</span>
                         <span className="nav-label">Cartões de Crédito</span>
                     </NavLink>
+                    <NavLink to="/product-groups" className="nav-item">
+                        <span className="nav-icon">🗃️</span>
+                        <span className="nav-label">Grupos de Produtos</span>
+                    </NavLink>
+
+                    <NavLink to="/suppliers" className="nav-item">
+                        <span className="nav-icon">🚚</span>
+                        <span className="nav-label">Fornecedores</span>
+                    </NavLink>
                 </div>
 
                 <div className="nav-section">
@@ -69,6 +78,20 @@ export function Sidebar() {
                     <NavLink to="/transactions" className="nav-item">
                         <span className="nav-icon">💸</span>
                         <span className="nav-label">Transações</span>
+                    </NavLink>
+                </div>
+
+                <div className="nav-section">
+                    <h3 className="nav-section-title">Estoque</h3>
+
+                    <NavLink to="/products" className="nav-item">
+                        <span className="nav-icon">📦</span>
+                        <span className="nav-label">Produtos</span>
+                    </NavLink>
+
+                    <NavLink to="/shopping-list" className="nav-item">
+                        <span className="nav-icon">🛒</span>
+                        <span className="nav-label">Lista de Compras</span>
                     </NavLink>
                 </div>
 

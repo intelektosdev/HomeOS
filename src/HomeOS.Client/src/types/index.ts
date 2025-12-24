@@ -140,3 +140,55 @@ export interface GroupedDataResponse {
     count: number;
 }
 
+// --- RECURRING TRANSACTIONS ---
+
+export type RecurrenceFrequency = 'Daily' | 'Weekly' | 'Biweekly' | 'Monthly' | 'Bimonthly' | 'Quarterly' | 'Semiannual' | 'Annual';
+export type AmountType = 'Fixed' | 'Variable';
+
+export interface CreateRecurringTransactionRequest {
+    description: string;
+    type: TransactionType;
+    categoryId: string;
+    accountId?: string;
+    creditCardId?: string;
+    amountType: AmountType;
+    amount: number;
+    frequency: RecurrenceFrequency;
+    dayOfMonth?: number;
+    startDate: string; // ISO Date
+    endDate?: string; // ISO Date
+    isActive?: boolean;
+}
+
+export interface UpdateRecurringTransactionRequest {
+    description: string;
+    categoryId: string;
+    accountId?: string;
+    creditCardId?: string;
+    amountType: AmountType;
+    amount: number;
+    frequency: RecurrenceFrequency;
+    dayOfMonth?: number;
+    endDate?: string;
+    isActive: boolean;
+}
+
+export interface RecurringTransactionResponse {
+    id: string;
+    description: string;
+    type: TransactionType;
+    categoryId: string;
+    accountId?: string;
+    creditCardId?: string;
+    amountType: AmountType;
+    amount: number;
+    frequency: RecurrenceFrequency;
+    dayOfMonth?: number;
+    startDate: string;
+    endDate?: string;
+    nextOccurrence: string;
+    isActive: boolean;
+    createdAt: string;
+    lastGeneratedAt?: string;
+}
+

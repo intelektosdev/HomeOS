@@ -12,6 +12,7 @@ import { Products } from './pages/Products';
 import { ShoppingList } from './pages/ShoppingList';
 import { ProductGroups } from './pages/ProductGroups';
 import { Suppliers } from './pages/Suppliers';
+import { RecurringTransactions } from './pages/RecurringTransactions';
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -132,6 +133,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Suppliers />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/recurring-transactions"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <RecurringTransactions />
                 </MainLayout>
               </ProtectedRoute>
             }

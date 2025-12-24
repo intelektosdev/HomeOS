@@ -79,6 +79,11 @@ export function Sidebar() {
                         <span className="nav-icon">💸</span>
                         <span className="nav-label">Transações</span>
                     </NavLink>
+
+                    <NavLink to="/recurring-transactions" className="nav-item">
+                        <span className="nav-icon">🔄</span>
+                        <span className="nav-label">Recorrências</span>
+                    </NavLink>
                 </div>
 
                 <div className="nav-section">

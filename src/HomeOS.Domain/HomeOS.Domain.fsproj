@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="UserTypes.fs" />
     <Compile Include="FinancialTypes.fs" />
+    <Compile Include="RecurringTransactionTypes.fs" />
     <Compile Include="InventoryTypes.fs" />
   </ItemGroup>
 

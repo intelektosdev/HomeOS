@@ -357,3 +357,42 @@ export const AnalyticsService = {
     }
 };
 
+export const RecurringTransactionsService = {
+    getAll: async (includeInactive = false) => {
+        const response = await api.get<import('../types').RecurringTransactionResponse[]>('/recurring-transactions', {
+            params: { includeInactive }
+        });
+        return response.data;
+    },
+    getById: async (id: string) => {
+        const response = await api.get<import('../types').RecurringTransactionResponse>(`/recurring-transactions/${id}`);
+        return response.data;
+    },
+    create: async (data: import('../types').CreateRecurringTransactionRequest) => {
+        const response = await api.post<import('../types').RecurringTransactionResponse>('/recurring-transactions', data);
+        return response.data;
+    },
+    update: async (id: string, data: import('../types').UpdateRecurringTransactionRequest) => {
+        const response = await api.put<import('../types').RecurringTransactionResponse>(`/recurring-transactions/${id}`, data);
+        return response.data;
+    },
+    toggle: async (id: string) => {
+        const response = await api.patch<import('../types').RecurringTransactionResponse>(`/recurring-transactions/${id}/toggle`);
+        return response.data;
+    },
+    delete: async (id: string) => {
+        await api.delete(`/recurring-transactions/${id}`);
+    },
+    preview: async (id: string, count = 12) => {
+        const response = await api.post<{ occurrences: string[] }>(`/recurring-transactions/${id}/preview`, { count });
+        return response.data.occurrences;
+    },
+    generateAll: async (daysAhead = 30) => {
+        const response = await api.post<{ generatedCount: number; targetDate: string }>('/recurring-transactions/generate', null, {
+            params: { daysAhead }
+        });
+        return response.data;
+    }
+};
+
+

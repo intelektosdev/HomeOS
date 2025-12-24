@@ -20,9 +20,11 @@ builder.Services.AddScoped<SupplierRepository>();
 builder.Services.AddScoped<ShoppingListRepository>();
 builder.Services.AddScoped<PurchaseItemRepository>();
 builder.Services.AddScoped<CreditCardPaymentRepository>();
+builder.Services.AddScoped<RecurringTransactionRepository>();
 
 // Register Services
 builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<HomeOS.Infra.Services.RecurringTransactionService>();
 
 // Add HttpContextAccessor for getting current user in controllers
 builder.Services.AddHttpContextAccessor();

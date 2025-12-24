@@ -10,9 +10,10 @@ namespace HomeOS.Api.Controllers;
 [ApiController]
 [Route("api/transactions")]
 [Authorize]
-public class TransactionController(TransactionRepository repository) : ControllerBase
+public class TransactionController(TransactionRepository repository, CategoryRepository categoryRepository) : ControllerBase
 {
     private readonly TransactionRepository _repository = repository;
+    private readonly CategoryRepository _categoryRepository = categoryRepository;
 
     private Guid GetCurrentUserId()
     {
@@ -48,6 +49,13 @@ public class TransactionController(TransactionRepository repository) : Controlle
 
         var installments = request.InstallmentCount ?? 1;
 
+        // Fetch category to determine transaction type
+        var category = _categoryRepository.GetById(request.CategoryId, userId);
+        if (category == null)
+        {
+            return BadRequest(new { error = "Category not found" });
+        }
+
         if (installments > 1)
         {
             if (!request.CreditCardId.HasValue)
@@ -78,6 +86,17 @@ public class TransactionController(TransactionRepository repository) : Controlle
                 if (result.IsError) return BadRequest(new { error = result.ErrorValue.ToString() });
 
                 var t = result.ResultValue;
+
+                // Set correct type based on category
+                if (category.Type == TransactionType.Income)
+                {
+                    t = new Transaction(
+                        t.Id, t.Description, TransactionType.Income, t.Status,
+                        t.Amount, t.DueDate, t.CreatedAt, t.CategoryId, t.Source,
+                        t.BillPaymentId, t.InstallmentId, t.InstallmentNumber, t.TotalInstallments
+                    );
+                }
+
                 // Add installment details
                 t = TransactionModule.addInstallmentDetails(t, installmentId, i + 1, installments);
 
@@ -100,6 +119,17 @@ public class TransactionController(TransactionRepository repository) : Controlle
             if (result.IsError) return BadRequest(new { error = result.ErrorValue.ToString() });
 
             var transaction = result.ResultValue;
+
+            // Set correct type based on category
+            if (category.Type == TransactionType.Income)
+            {
+                transaction = new Transaction(
+                    transaction.Id, transaction.Description, TransactionType.Income, transaction.Status,
+                    transaction.Amount, transaction.DueDate, transaction.CreatedAt, transaction.CategoryId, transaction.Source,
+                    transaction.BillPaymentId, transaction.InstallmentId, transaction.InstallmentNumber, transaction.TotalInstallments
+                );
+            }
+
             _repository.Save(transaction, userId);
 
             return CreatedAtAction(nameof(GetById), new { id = transaction.Id }, MapToResponse(transaction));

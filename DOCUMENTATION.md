@@ -109,5 +109,54 @@ Módulo avançado para gestão de despesas via cartão, incluindo parcelamento e
     - **Juros Compostos**: Suporte a cálculo de juros mensais em compras parceladas. O valor total da transação é recalculado automaticamente utilizando a fórmula de juros compostos para refletir o custo real da compra a prazo.
 
 ---
+### H. Transações Recorrentes (Novo)
+Sistema completo para automação de lançamentos periódicos (receitas e despesas), eliminando o trabalho manual de registro mensal.
+
+- **tipos de Recorrência**:
+    - **8 Frequências Suportadas**: Diária, Semanal, Quinzenal, Mensal, Bimestral, Trimestral, Semestral, Anual.
+    - **Valores Fixos**: Para despesas/receitas com valor constante (ex: salário R$ 5.000, condomínio R$ 800).
+    - **Valores Variáveis**: Para contas com valor flutuante (ex: luz ~R$ 180, água ~R$ 90). O sistema usa a média para geração e permite ajuste posterior.
+
+- **Domínio (F#)**:
+    - `RecurrenceFrequency`: Discriminated Union com 8 opções de periodicidade.
+    - `AmountType`: Fixed (valor exato) ou Variable (média estimada).
+    - `RecurringTransaction`: Entidade com regras de validação e cálculo inteligente de próximas datas.
+    - **`RecurringTransactionModule.calculateNextOccurrence`**: Lógica sofisticada que:
+        - Lida com meses de 30/31 dias (dia 31 em fevereiro = dia 28/29).
+        - Suporta "último dia do mês" (útil para faturas de cartão).
+        - Calcula corretamente anos bissextos.
+
+- **Funcionalidades Backend**:
+    - **Geração Automática**: Serviço que cria transações futuras baseado em recorrências ativas.
+    - **Preview de Ocorrências**: Visualização das próximas 12 datas sem persistir.
+    - **Rastreabilidade**: Tabela `GeneratedTransactions` mantém vínculo entre transações geradas e sua origem recorrente.
+    - **Controle de Ativação**: Habilitar/desabilitar recorrências sem excluir histórico.
+
+- **API REST**:
+    - `GET /api/recurring-transactions` - Listar todas (com filtro de inativas).
+    - `POST /api/recurring-transactions` - Criar nova recorrência.
+    - `PUT /api/recurring-transactions/{id}` - Atualizar configuração.
+    - `PATCH /api/recurring-transactions/{id}/toggle` - Ativar/desativar.
+    - `POST /api/recurring-transactions/{id}/preview` - Prévia de datas futuras.
+    - `POST /api/recurring-transactions/generate` - Gatilho manual de geração (útil para testes).
+
+- **Casos de Uso**:
+    - **Salário Mensal**: Receita fixa de R$ 5.000 todo dia 5, gerando automaticamente lançamentos futuros.
+    - **Conta de Luz**: Despesa variável ~R$ 180 todo dia 15, permitindo ajuste do valor real quando chegar a conta.
+    - **IPTU Anual**: Despesa fixa parcelada em 10x, com geração automática das parcelas.
+    - **Assinaturas**: Netflix, Spotify, etc. com renovação mensal automática.
+
+- **Banco de Dados**:
+    - `Finance.RecurringTransactions`: Tabela principal com 21 colunas e constraints de integridade.
+    - `Finance.GeneratedTransactions`: Tabela de auditoria para rastreamento.
+    - Índices otimizados em `NextOccurrence` e `UserId+IsActive` para performance.
+
+- **Benefícios**:
+    - ✅ **Automação Total**: Nunca mais esquecer de lançar condomínio ou salário.
+    - ✅ **Fluxo de Caixa Preciso**: Projeções financeiras baseadas em compromissos reais.
+    - ✅ **Orçamento Realista**: Saber exatamente quais despesas virão nos próximos meses.
+    - ✅ **Detecção de Anomalias**: Valores variáveis fora do padrão ficam evidentes.
+
+---
 *Documentação atualizada em 2025-12-24*
 

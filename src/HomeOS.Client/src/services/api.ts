@@ -11,7 +11,11 @@ import type {
     UpdateTransactionRequest,
     CancelTransactionRequest,
     ConciliateTransactionRequest,
-    PayTransactionRequest
+    PayTransactionRequest,
+    CreditCardBalanceResponse,
+    PendingTransaction,
+    PayBillRequest,
+    PayBillResponse
 } from '../types';
 
 export const api = axios.create({
@@ -87,6 +91,18 @@ export const CreditCardsService = {
     },
     update: async (id: string, data: CreateCreditCardRequest) => {
         const response = await api.put<CreditCardResponse>(`/credit-cards/${id}`, data);
+        return response.data;
+    },
+    getBalance: async (id: string) => {
+        const response = await api.get<CreditCardBalanceResponse>(`/credit-cards/${id}/balance`);
+        return response.data;
+    },
+    getPendingTransactions: async (id: string) => {
+        const response = await api.get<PendingTransaction[]>(`/credit-cards/${id}/pending-transactions`);
+        return response.data;
+    },
+    payBill: async (id: string, data: PayBillRequest) => {
+        const response = await api.post<PayBillResponse>(`/credit-cards/${id}/pay-bill`, data);
         return response.data;
     }
 };

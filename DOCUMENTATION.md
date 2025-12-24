@@ -86,5 +86,28 @@ Módulo completo para gestão de estoque doméstico e compras.
 - **Transações**: Seleção de Cartão de Crédito como origem de pagamento corrigida e funcional.
 
 ---
-*Documentação atualizada em 2025-12-23*
+### G. Controle de Cartões de Crédito (Novo)
+Módulo avançado para gestão de despesas via cartão, incluindo parcelamento e pagamento de faturas.
+
+- **Parcelamento Inteligente**:
+    - Suporte a compras parceladas diretamente no formulário de transação.
+    - O sistema gera automaticamente N transações (uma para cada mês subsequente) mantendo o valor total impactando o limite imediatamente.
+    - Visualização clara de "Parcela X de Y" nas listas de transações.
+
+- **Gestão de Faturas (Statement View)**:
+    - **Extrato Futuro**: Novo modo de visualização "Detalhes do Cartão" que agrupa lançamentos futuros por mês (YYYY-MM), permitindo projeção de gastos.
+    - **Pagamento de Fatura**:
+        - Fluxo automatizado de seleção de transações pendentes.
+        - Seleção da conta de origem (Checking/Wallet).
+        - Criação automática de um registro de `CreditCardPayment` e conciliação em lote das transações pagas.
+    - **Indicadores**:
+        - Barra de progresso visual do Limite Utilizado.
+        - Contadores de transações pendentes.
+
+- **Cálculo de Juros e Vencimento Inteligente**:
+    - **Vencimento Automático**: Ao selecionar um cartão, a data de vencimento é preenchida automaticamente baseada no dia de fechamento (Compra após fechamento = Vencimento no próximo mês).
+    - **Juros Compostos**: Suporte a cálculo de juros mensais em compras parceladas. O valor total da transação é recalculado automaticamente utilizando a fórmula de juros compostos para refletir o custo real da compra a prazo.
+
+---
+*Documentação atualizada em 2025-12-24*
 

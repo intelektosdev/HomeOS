@@ -6,13 +6,17 @@ namespace HomeOS.Infra.DataModels;
 public class TransactionDbModel
 {
     public Guid Id { get; set; }
-    public Guid UserId { get; set; } // Adicionado pois seu SQL tem FK
+    public Guid UserId { get; set; }
     public string Description { get; set; } = string.Empty;
     public decimal Amount { get; set; }
-    public byte Type { get; set; } // TINYINT no SQL vira byte no C#
+    public byte Type { get; set; }
     public Guid CategoryId { get; set; }
     public Guid? AccountId { get; set; }
     public Guid? CreditCardId { get; set; }
+    public Guid? BillPaymentId { get; set; } // FK to CreditCardPayments
+    public Guid? InstallmentId { get; set; }
+    public int? InstallmentNumber { get; set; }
+    public int? TotalInstallments { get; set; }
     public DateTime DueDate { get; set; }
     public DateTime CreatedAt { get; set; }
 

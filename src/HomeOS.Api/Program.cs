@@ -19,6 +19,7 @@ builder.Services.AddScoped<ProductGroupRepository>();
 builder.Services.AddScoped<SupplierRepository>();
 builder.Services.AddScoped<ShoppingListRepository>();
 builder.Services.AddScoped<PurchaseItemRepository>();
+builder.Services.AddScoped<CreditCardPaymentRepository>();
 
 // Register Services
 builder.Services.AddScoped<JwtService>();

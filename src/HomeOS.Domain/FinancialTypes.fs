@@ -49,6 +49,14 @@ type CreditCard =
       DueDay: int
       Limit: Money }
 
+type CreditCardPayment =
+    { Id: Guid
+      CreditCardId: Guid
+      AccountId: Guid
+      Amount: Money
+      PaymentDate: DateTime
+      ReferenceMonth: int } // YYYYMM format
+
 type Transaction =
     { Id: Guid
       Description: string
@@ -57,9 +65,12 @@ type Transaction =
       Amount: Money
       DueDate: DateTime
       CreatedAt: DateTime
-      // Novos campos
       CategoryId: Guid
-      Source: TransactionSource }
+      Source: TransactionSource
+      BillPaymentId: Guid option
+      InstallmentId: Guid option
+      InstallmentNumber: int option
+      TotalInstallments: int option }
 
 // --- COMPORTAMENTOS (MODULES) ---
 
@@ -158,7 +169,11 @@ module TransactionModule =
                   DueDate = dueDate
                   CreatedAt = DateTime.Now
                   CategoryId = categoryId
-                  Source = source }
+                  Source = source
+                  BillPaymentId = None
+                  InstallmentId = None
+                  InstallmentNumber = None
+                  TotalInstallments = None }
 
     // Função Pura: Recebe transação atual -> Retorna nova transação ou Erro
     let pay (transaction: Transaction) (paymentDate: DateTime) : Result<Transaction, DomainError> =
@@ -176,6 +191,12 @@ module TransactionModule =
             | Paid _
             | Conciliated _ -> Error TransactionAlreadyPaid
             | Cancelled _ -> Error TransactionIsCancelled
+
+    let addInstallmentDetails (transaction: Transaction) (id: Guid) (number: int) (total: int) : Transaction =
+        { transaction with
+            InstallmentId = Some id
+            InstallmentNumber = Some number
+            TotalInstallments = Some total }
 
     let cancel (transaction: Transaction) (reason: string) : Result<Transaction, DomainError> =
         match transaction.Status with

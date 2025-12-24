@@ -9,7 +9,9 @@ public record CreateTransactionRequest(
     DateTime DueDate,
     [Required] Guid CategoryId,
     Guid? AccountId,
-    Guid? CreditCardId
+    Guid? CreditCardId,
+    // Installment fields
+    int? InstallmentCount // 1 or null = single transaction
 );
 
 public record UpdateTransactionRequest(
@@ -38,5 +40,8 @@ public record TransactionResponse(
     DateTime DueDate,
     Guid CategoryId,
     Guid? AccountId,
-    Guid? CreditCardId
+    Guid? CreditCardId,
+    Guid? InstallmentId,
+    int? InstallmentNumber,
+    int? TotalInstallments
 );

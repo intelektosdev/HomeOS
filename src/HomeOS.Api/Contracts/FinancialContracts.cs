@@ -56,3 +56,27 @@ public record CreditCardResponse(
     int DueDay,
     decimal Limit
 );
+
+// --- CREDIT CARD BILL PAYMENT ---
+
+public record CreditCardBalanceResponse(
+    Guid Id,
+    string Name,
+    decimal Limit,
+    decimal UsedLimit,
+    decimal AvailableLimit,
+    int PendingTransactionsCount
+);
+
+public record PayBillRequest(
+    Guid AccountId,
+    int ReferenceMonth, // YYYYMM format
+    Guid[] TransactionIds
+);
+
+public record PayBillResponse(
+    Guid BillPaymentId,
+    decimal Amount,
+    int TransactionsCount
+);
+

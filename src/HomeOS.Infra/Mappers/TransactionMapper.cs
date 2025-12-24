@@ -63,6 +63,17 @@ public static class TransactionMapper
                 break;
         }
 
+        // Mapping BillPaymentId (F# Option -> Nullable)
+        if (FSharpOption<Guid>.get_IsSome(domain.BillPaymentId))
+        {
+            dbModel.BillPaymentId = domain.BillPaymentId.Value;
+        }
+
+        // Mapping Installment Fields
+        if (FSharpOption<Guid>.get_IsSome(domain.InstallmentId)) dbModel.InstallmentId = domain.InstallmentId.Value;
+        if (FSharpOption<int>.get_IsSome(domain.InstallmentNumber)) dbModel.InstallmentNumber = domain.InstallmentNumber.Value;
+        if (FSharpOption<int>.get_IsSome(domain.TotalInstallments)) dbModel.TotalInstallments = domain.TotalInstallments.Value;
+
         return dbModel;
     }
 
@@ -99,6 +110,15 @@ public static class TransactionMapper
             source = TransactionSource.NewFromAccount(Guid.Empty);
         }
 
+        // Mapping BillPaymentId (Nullable -> F# Option)
+        var billPaymentId = db.BillPaymentId.HasValue
+            ? FSharpOption<Guid>.Some(db.BillPaymentId.Value)
+            : FSharpOption<Guid>.None;
+
+        var installmentId = db.InstallmentId.HasValue ? FSharpOption<Guid>.Some(db.InstallmentId.Value) : FSharpOption<Guid>.None;
+        var installmentNumber = db.InstallmentNumber.HasValue ? FSharpOption<int>.Some(db.InstallmentNumber.Value) : FSharpOption<int>.None;
+        var totalInstallments = db.TotalInstallments.HasValue ? FSharpOption<int>.Some(db.TotalInstallments.Value) : FSharpOption<int>.None;
+
         return new Transaction(
             db.Id,
             db.Description,
@@ -108,7 +128,11 @@ public static class TransactionMapper
             db.DueDate,
             db.CreatedAt,
             db.CategoryId,
-            source
+            source,
+            billPaymentId,
+            installmentId,
+            installmentNumber,
+            totalInstallments
         );
 
     }

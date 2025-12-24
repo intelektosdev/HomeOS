@@ -50,6 +50,38 @@ export interface CreditCardResponse {
     limit: number;
 }
 
+export interface CreditCardBalanceResponse {
+    id: string;
+    name: string;
+    limit: number;
+    usedLimit: number;
+    availableLimit: number;
+    pendingTransactionsCount: number;
+}
+
+export interface PendingTransaction {
+    id: string;
+    description: string;
+    amount: number;
+    dueDate: string;
+    categoryId: string;
+    status: string;
+    installmentNumber?: number;
+    totalInstallments?: number;
+}
+
+export interface PayBillRequest {
+    accountId: string;
+    referenceMonth: number;
+    transactionIds: string[];
+}
+
+export interface PayBillResponse {
+    billPaymentId: string;
+    amount: number;
+    transactionsCount: number;
+}
+
 // --- TRANSACTIONS ---
 
 export interface CreateTransactionRequest {
@@ -59,6 +91,7 @@ export interface CreateTransactionRequest {
     categoryId: string;
     accountId?: string;
     creditCardId?: string;
+    installmentCount?: number;
 }
 
 export interface UpdateTransactionRequest extends CreateTransactionRequest { }
@@ -84,4 +117,7 @@ export interface TransactionResponse {
     categoryId: string;
     accountId?: string;
     creditCardId?: string;
+    installmentId?: string;
+    installmentNumber?: number;
+    totalInstallments?: number;
 }

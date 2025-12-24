@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CreditCardsService } from '../services/api';
 import type { CreditCardResponse, CreateCreditCardRequest } from '../types';
+import { CreditCardDetails } from '../components/CreditCardDetails';
 
 type ViewMode = 'cards' | 'grid';
 
@@ -16,6 +17,7 @@ export function CreditCards() {
         limit: 0
     });
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [viewDetailsId, setViewDetailsId] = useState<string | null>(null);
 
     const loadCreditCards = async () => {
         try {
@@ -202,6 +204,14 @@ export function CreditCards() {
                                     >
                                         ✏️
                                     </button>
+                                    <button
+                                        className="btn-icon"
+                                        title="Ver Detalhes e Fatura"
+                                        onClick={() => setViewDetailsId(card.id)}
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                                    >
+                                        📄
+                                    </button>
                                 </div>
                             </div>
                         ))
@@ -249,6 +259,14 @@ export function CreditCards() {
                                             >
                                                 ✏️
                                             </button>
+                                            <button
+                                                className="btn-icon"
+                                                title="Ver Detalhes"
+                                                onClick={() => setViewDetailsId(card.id)}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                                            >
+                                                📄
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -257,6 +275,20 @@ export function CreditCards() {
                     )}
                 </div>
             )}
-        </div>
+
+
+            {
+                viewDetailsId && (
+                    <CreditCardDetails
+                        cardId={viewDetailsId}
+                        onClose={() => setViewDetailsId(null)}
+                        onPaymentSuccess={() => {
+                            loadCreditCards(); // Reload cards to potentially update limits if needed, though mostly local
+                            // Maybe show success toast?
+                        }}
+                    />
+                )
+            }
+        </div >
     );
 }

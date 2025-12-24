@@ -10,9 +10,14 @@ namespace HomeOS.Api.Controllers;
 [ApiController]
 [Route("api/credit-cards")]
 [Authorize]
-public class CreditCardController(CreditCardRepository repository) : ControllerBase
+public class CreditCardController(
+    CreditCardRepository repository,
+    TransactionRepository transactionRepository,
+    CreditCardPaymentRepository paymentRepository) : ControllerBase
 {
     private readonly CreditCardRepository _repository = repository;
+    private readonly TransactionRepository _transactionRepository = transactionRepository;
+    private readonly CreditCardPaymentRepository _paymentRepository = paymentRepository;
 
     private Guid GetCurrentUserId()
     {
@@ -115,4 +120,98 @@ public class CreditCardController(CreditCardRepository repository) : ControllerB
 
         return Ok(response);
     }
+
+    /// <summary>
+    /// Get card balance: limit, used, available
+    /// </summary>
+    [HttpGet("{id}/balance")]
+    public IActionResult GetBalance(Guid id)
+    {
+        var userId = GetCurrentUserId();
+        var card = _repository.GetById(id, userId);
+        if (card == null) return NotFound();
+
+        var usedLimit = _transactionRepository.GetUsedLimitByCard(id, userId);
+        var pendingTransactions = _transactionRepository.GetPendingByCard(id, userId);
+
+        var response = new CreditCardBalanceResponse(
+            card.Id,
+            card.Name,
+            card.Limit,
+            usedLimit,
+            card.Limit - usedLimit,
+            pendingTransactions.Count()
+        );
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Get transactions pending for bill payment
+    /// </summary>
+    [HttpGet("{id}/pending-transactions")]
+    public IActionResult GetPendingTransactions(Guid id)
+    {
+        var userId = GetCurrentUserId();
+        var card = _repository.GetById(id, userId);
+        if (card == null) return NotFound();
+
+        var transactions = _transactionRepository.GetPendingByCard(id, userId);
+
+        // Map to ensure correct casing for frontend
+        var response = transactions.Select(t => new
+        {
+            Id = (Guid)t.Id,
+            Description = (string)t.Description,
+            Amount = (decimal)t.Amount,
+            DueDate = (DateTime)t.DueDate,
+            CategoryId = (Guid)t.CategoryId,
+            Status = (string)t.Status,
+            InstallmentNumber = t.InstallmentNumber != null ? (int?)t.InstallmentNumber : null,
+            TotalInstallments = t.TotalInstallments != null ? (int?)t.TotalInstallments : null
+        });
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Pay credit card bill
+    /// </summary>
+    [HttpPost("{id}/pay-bill")]
+    public IActionResult PayBill(Guid id, [FromBody] PayBillRequest request)
+    {
+        var userId = GetCurrentUserId();
+        var card = _repository.GetById(id, userId);
+        if (card == null) return NotFound();
+
+        if (request.TransactionIds == null || request.TransactionIds.Length == 0)
+        {
+            return BadRequest(new { error = "At least one transaction must be selected" });
+        }
+
+        // Calculate total amount from selected transactions
+        var pendingTransactions = _transactionRepository.GetPendingByCard(id, userId).ToList();
+        var selectedIds = request.TransactionIds.ToHashSet();
+        var totalAmount = pendingTransactions
+            .Where(t => selectedIds.Contains((Guid)t.Id))
+            .Sum(t => (decimal)t.Amount);
+
+        // Create payment record
+        var payment = new CreditCardPayment(
+            Guid.NewGuid(),
+            id,
+            request.AccountId,
+            totalAmount,
+            DateTime.Now,
+            request.ReferenceMonth
+        );
+
+        _paymentRepository.Save(payment, userId);
+
+        // Link transactions to payment and mark as Conciliated
+        _transactionRepository.LinkToBillPayment(request.TransactionIds, payment.Id, userId);
+
+        return Ok(new PayBillResponse(payment.Id, totalAmount, request.TransactionIds.Length));
+    }
 }
+

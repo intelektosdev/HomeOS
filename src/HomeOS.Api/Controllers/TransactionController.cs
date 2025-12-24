@@ -24,13 +24,12 @@ public class TransactionController(TransactionRepository repository) : Controlle
         return userId;
     }
 
-    // 1. POST: Agora recebe um JSON no Body ([FromBody])
+    // 1. POST: Create Expense (supports installments via Credit Card)
     [HttpPost]
     public IActionResult CreateExpense([FromBody] CreateTransactionRequest request)
     {
         var userId = GetCurrentUserId();
 
-        // Validação: Ou AccountId ou CreditCardId, nunca ambos ou nenhum
         if ((request.AccountId.HasValue && request.CreditCardId.HasValue) ||
             (!request.AccountId.HasValue && !request.CreditCardId.HasValue))
         {
@@ -47,41 +46,76 @@ public class TransactionController(TransactionRepository repository) : Controlle
             source = TransactionSource.NewFromCreditCard(request.CreditCardId!.Value);
         }
 
-        // Chama o F# usando os dados do DTO
-        var result = TransactionModule.createExpense(
-            request.Description,
-            request.Amount,
-            request.DueDate,
-            request.CategoryId,
-            source
-        );
+        var installments = request.InstallmentCount ?? 1;
 
-        if (result.IsError)
+        if (installments > 1)
         {
-            // Tratamento de erro elegante
-            return BadRequest(new { error = result.ErrorValue.ToString() });
+            if (!request.CreditCardId.HasValue)
+            {
+                return BadRequest(new { error = "Installments are only allowed for Credit Card transactions." });
+            }
+
+            decimal totalAmount = request.Amount;
+            decimal installmentValue = Math.Floor(totalAmount / installments * 100) / 100;
+            decimal remainder = totalAmount - (installmentValue * installments);
+
+            var installmentId = Guid.NewGuid();
+            var createdTransactions = new List<Transaction>();
+
+            for (int i = 0; i < installments; i++)
+            {
+                decimal currentAmount = installmentValue + (i == 0 ? remainder : 0);
+                DateTime currentDueDate = request.DueDate.AddMonths(i);
+
+                var result = TransactionModule.createExpense(
+                    request.Description,
+                    currentAmount,
+                    currentDueDate,
+                    request.CategoryId,
+                    source
+                );
+
+                if (result.IsError) return BadRequest(new { error = result.ErrorValue.ToString() });
+
+                var t = result.ResultValue;
+                // Add installment details
+                t = TransactionModule.addInstallmentDetails(t, installmentId, i + 1, installments);
+
+                _repository.Save(t, userId);
+                createdTransactions.Add(t);
+            }
+
+            return CreatedAtAction(nameof(GetById), new { id = createdTransactions[0].Id }, MapToResponse(createdTransactions[0]));
         }
+        else
+        {
+            var result = TransactionModule.createExpense(
+                request.Description,
+                request.Amount,
+                request.DueDate,
+                request.CategoryId,
+                source
+            );
 
-        var transaction = result.ResultValue;
+            if (result.IsError) return BadRequest(new { error = result.ErrorValue.ToString() });
 
-        _repository.Save(transaction, userId);
+            var transaction = result.ResultValue;
+            _repository.Save(transaction, userId);
 
-        return CreatedAtAction(nameof(GetById), new { id = transaction.Id }, MapToResponse(transaction));
+            return CreatedAtAction(nameof(GetById), new { id = transaction.Id }, MapToResponse(transaction));
+        }
     }
 
-    // 2. GET (Extrato): Endpoint novo
+    // 2. GET (Extrato)
     [HttpGet]
     public IActionResult GetStatement([FromQuery] DateTime? start, [FromQuery] DateTime? end)
     {
         var userId = GetCurrentUserId();
-
-        // Padrão: Mês atual se não passar data
         var startDate = start ?? new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
         var endDate = end ?? startDate.AddMonths(1).AddDays(-1);
 
         var transactions = _repository.GetStatement(startDate, endDate, userId);
 
-        // Map dynamic results to proper DTOs
         var response = transactions.Select(t => new
         {
             Id = (Guid)t.Id,
@@ -91,13 +125,14 @@ public class TransactionController(TransactionRepository repository) : Controlle
             DueDate = (DateTime)t.DueDate,
             CategoryId = (Guid)t.CategoryId,
             AccountId = t.AccountId != null ? (Guid?)t.AccountId : null,
-            CreditCardId = t.CreditCardId != null ? (Guid?)t.CreditCardId : null
+            CreditCardId = t.CreditCardId != null ? (Guid?)t.CreditCardId : null,
+            BillPaymentId = t.BillPaymentId != null ? (Guid?)t.BillPaymentId : null
         }).ToList();
 
         return Ok(response);
     }
 
-    // 3. GET Single: Útil para o CreatedAtAction
+    // 3. GET Single
     [HttpGet("{id}")]
     public IActionResult GetById(Guid id)
     {
@@ -105,18 +140,9 @@ public class TransactionController(TransactionRepository repository) : Controlle
         var transaction = _repository.GetById(id, userId);
         if (transaction == null) return NotFound();
 
-        // Mapeamento simples para retorno
-        return Ok(new
-        {
-            transaction.Id,
-            transaction.Description,
-            transaction.Amount,
-            transaction.CategoryId,
-            // Source simplificado para response
-            AccountId = transaction.Source.IsFromAccount ? ((TransactionSource.FromAccount)transaction.Source).accountId : (Guid?)null,
-            CreditCardId = transaction.Source.IsFromCreditCard ? ((TransactionSource.FromCreditCard)transaction.Source).creditCardId : (Guid?)null
-        });
+        return Ok(MapToResponse(transaction));
     }
+
     // 4. PUT: Atualizar Transação
     [HttpPut("{id}")]
     public IActionResult Update(Guid id, [FromBody] UpdateTransactionRequest request)
@@ -150,10 +176,7 @@ public class TransactionController(TransactionRepository repository) : Controlle
             source
         );
 
-        if (result.IsError)
-        {
-            return BadRequest(new { error = result.ErrorValue.ToString() });
-        }
+        if (result.IsError) return BadRequest(new { error = result.ErrorValue.ToString() });
 
         var updatedTransaction = result.ResultValue;
         _repository.Save(updatedTransaction, userId);
@@ -171,10 +194,7 @@ public class TransactionController(TransactionRepository repository) : Controlle
 
         var result = TransactionModule.cancel(transaction, request.Reason);
 
-        if (result.IsError)
-        {
-            return BadRequest(new { error = result.ErrorValue.ToString() });
-        }
+        if (result.IsError) return BadRequest(new { error = result.ErrorValue.ToString() });
 
         var updatedTransaction = result.ResultValue;
         _repository.Save(updatedTransaction, userId);
@@ -193,10 +213,7 @@ public class TransactionController(TransactionRepository repository) : Controlle
         var paymentDate = request.PaymentDate ?? DateTime.Now;
         var result = TransactionModule.pay(existing, paymentDate);
 
-        if (result.IsError)
-        {
-            return BadRequest(new { error = result.ErrorValue.ToString() });
-        }
+        if (result.IsError) return BadRequest(new { error = result.ErrorValue.ToString() });
 
         var updatedTransaction = result.ResultValue;
         _repository.Save(updatedTransaction, userId);
@@ -215,10 +232,7 @@ public class TransactionController(TransactionRepository repository) : Controlle
         var conciliatedAt = request.ConciliatedAt ?? DateTime.Now;
         var result = TransactionModule.conciliate(existing, conciliatedAt);
 
-        if (result.IsError)
-        {
-            return BadRequest(new { error = result.ErrorValue.ToString() });
-        }
+        if (result.IsError) return BadRequest(new { error = result.ErrorValue.ToString() });
 
         var updatedTransaction = result.ResultValue;
         _repository.Save(updatedTransaction, userId);
@@ -236,7 +250,12 @@ public class TransactionController(TransactionRepository repository) : Controlle
             t.DueDate,
             t.CategoryId,
             t.Source.IsFromAccount ? ((TransactionSource.FromAccount)t.Source).accountId : (Guid?)null,
-            t.Source.IsFromCreditCard ? ((TransactionSource.FromCreditCard)t.Source).creditCardId : (Guid?)null
+            t.Source.IsFromCreditCard ? ((TransactionSource.FromCreditCard)t.Source).creditCardId : (Guid?)null,
+
+            // Installment Mapping
+            Microsoft.FSharp.Core.FSharpOption<Guid>.get_IsSome(t.InstallmentId) ? t.InstallmentId.Value : (Guid?)null,
+            Microsoft.FSharp.Core.FSharpOption<int>.get_IsSome(t.InstallmentNumber) ? t.InstallmentNumber.Value : (int?)null,
+            Microsoft.FSharp.Core.FSharpOption<int>.get_IsSome(t.TotalInstallments) ? t.TotalInstallments.Value : (int?)null
         );
     }
 }

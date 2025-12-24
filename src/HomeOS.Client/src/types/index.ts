@@ -121,3 +121,22 @@ export interface TransactionResponse {
     installmentNumber?: number;
     totalInstallments?: number;
 }
+
+// --- ANALYTICS ---
+
+export interface AnalyticsSummaryResponse {
+    totalIncome: number;
+    totalExpense: number;
+    balance: number;
+    pendingCount: number;
+    groups: GroupedDataResponse[];
+}
+
+export interface GroupedDataResponse {
+    key: string;
+    label: string;
+    income: number;
+    expense: number;
+    count: number;
+}
+

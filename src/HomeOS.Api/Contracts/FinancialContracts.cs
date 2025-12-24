@@ -80,3 +80,22 @@ public record PayBillResponse(
     int TransactionsCount
 );
 
+// --- ANALYTICS ---
+
+public record AnalyticsSummaryResponse(
+    decimal TotalIncome,
+    decimal TotalExpense,
+    decimal Balance,
+    int PendingCount,
+    List<GroupedDataResponse> Groups
+);
+
+public record GroupedDataResponse(
+    string Key,
+    string Label,
+    decimal Income,
+    decimal Expense,
+    int Count
+);
+
+

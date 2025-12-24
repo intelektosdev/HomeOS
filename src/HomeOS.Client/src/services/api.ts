@@ -347,3 +347,13 @@ export const PurchasesService = {
         return response.data;
     }
 };
+
+export const AnalyticsService = {
+    getSummary: async (startDate: string, endDate: string, groupBy: string = 'category') => {
+        const response = await api.get<import('../types').AnalyticsSummaryResponse>('/analytics/summary', {
+            params: { startDate, endDate, groupBy }
+        });
+        return response.data;
+    }
+};
+

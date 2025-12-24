@@ -146,4 +146,58 @@ public class TransactionRepository(IConfiguration configuration)
         connection.Open();
         connection.Execute(sql, new { TransactionIds = transactionIds, BillPaymentId = billPaymentId, UserId = userId });
     }
+
+    /// <summary>
+    /// Get aggregated analytics summary grouped by the specified dimension
+    /// </summary>
+    public IEnumerable<dynamic> GetAnalyticsSummary(DateTime startDate, DateTime endDate, string groupBy, Guid userId)
+    {
+        // Build dynamic GROUP BY based on groupBy parameter
+        var groupByClause = groupBy.ToLower() switch
+        {
+            "category" => "c.Name",
+            "account" => "COALESCE(a.Name, cc.Name)",
+            "status" => @"CASE 
+                WHEN t.StatusId = 1 THEN 'Pending'
+                WHEN t.StatusId = 2 THEN 'Paid'
+                WHEN t.StatusId = 3 THEN 'Conciliated'
+                WHEN t.StatusId = 4 THEN 'Cancelled'
+            END",
+            _ => "c.Name" // default to category
+        };
+
+        var labelColumn = groupBy.ToLower() switch
+        {
+            "category" => "c.Name",
+            "account" => "COALESCE(a.Name, cc.Name, 'Sem Origem')",
+            "status" => @"CASE 
+                WHEN t.StatusId = 1 THEN 'Pendente'
+                WHEN t.StatusId = 2 THEN 'Pago'
+                WHEN t.StatusId = 3 THEN 'Conciliado'
+                WHEN t.StatusId = 4 THEN 'Cancelado'
+            END",
+            _ => "c.Name"
+        };
+
+        var sql = $@"
+        SELECT 
+            {groupByClause} as [Key],
+            {labelColumn} as Label,
+            SUM(CASE WHEN t.Type = 1 THEN t.Amount ELSE 0 END) as Income,
+            SUM(CASE WHEN t.Type = 2 THEN t.Amount ELSE 0 END) as Expense,
+            COUNT(*) as [Count]
+        FROM [Finance].[Transactions] t
+        LEFT JOIN [Finance].[Categories] c ON t.CategoryId = c.Id
+        LEFT JOIN [Finance].[Accounts] a ON t.AccountId = a.Id
+        LEFT JOIN [Finance].[CreditCards] cc ON t.CreditCardId = cc.Id
+        WHERE t.DueDate BETWEEN @StartDate AND @EndDate 
+            AND t.UserId = @UserId
+            AND t.StatusId != 4  -- Exclude Cancelled
+        GROUP BY {groupByClause}, {labelColumn}
+        ORDER BY Expense DESC, Income DESC";
+
+        using var connection = new SqlConnection(_connectionString);
+        return connection.Query(sql, new { StartDate = startDate, EndDate = endDate, UserId = userId });
+    }
 }
+

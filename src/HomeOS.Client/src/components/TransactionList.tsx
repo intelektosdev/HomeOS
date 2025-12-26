@@ -8,15 +8,29 @@ interface TransactionListProps {
     onConciliate: (t: TransactionResponse) => void;
     onPay: (t: TransactionResponse) => void;
     refreshTrigger: number;
+    filters: {
+        month: number;
+        year: number;
+        categoryId?: string;
+        accountId?: string;
+    };
 }
 
-export function TransactionList({ onEdit, onCancel, onConciliate, onPay, refreshTrigger }: TransactionListProps) {
+export function TransactionList({ onEdit, onCancel, onConciliate, onPay, refreshTrigger, filters }: TransactionListProps) {
     const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
     const [loading, setLoading] = useState(true);
 
     const loadTransactions = async () => {
         try {
-            const data = await TransactionsService.getAll();
+            setLoading(true);
+            const startDate = new Date(filters.year, filters.month - 1, 1);
+            const endDate = new Date(filters.year, filters.month, 0); // Last day of month
+
+            // Format YYYY-MM-DD
+            const startStr = startDate.toISOString().split('T')[0];
+            const endStr = endDate.toISOString().split('T')[0];
+
+            const data = await TransactionsService.getAll(startStr, endStr, filters.categoryId, filters.accountId);
             setTransactions(data);
         } catch (error) {
             console.error("Erro ao carregar transações", error);
@@ -27,7 +41,7 @@ export function TransactionList({ onEdit, onCancel, onConciliate, onPay, refresh
 
     useEffect(() => {
         loadTransactions();
-    }, [refreshTrigger]);
+    }, [refreshTrigger, filters]);
 
     if (loading) return <div style={{ textAlign: 'center', marginTop: '2rem' }}>Carregando extrato...</div>;
 

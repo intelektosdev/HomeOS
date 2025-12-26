@@ -1,6 +1,7 @@
 .sidebar {
     width: 280px;
-    min-height: 100vh;
+    height: 100vh;
+    /* Use height instead of min-height */
     background: linear-gradient(180deg,
             rgba(30, 30, 50, 0.95) 0%,
             rgba(20, 20, 40, 0.98) 100%);
@@ -13,12 +14,14 @@
     z-index: 100;
     display: flex;
     flex-direction: column;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-header {
-    padding: 0 1.5rem 2rem;
+    padding: 0 1.5rem 1.5rem;
     border-bottom: 1px solid var(--color-border);
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
+    flex-shrink: 0;
 }
 
 .sidebar-logo {
@@ -28,7 +31,7 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    margin: 0 0 0.5rem 0;
+    margin: 0;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -42,54 +45,112 @@
 .sidebar-subtitle {
     color: var(--color-text-secondary);
     font-size: 0.875rem;
-    margin: 0;
-    padding-left: 2.75rem;
+    margin-top: 0.5rem;
+    padding-left: 0;
 }
 
 .sidebar-nav {
     flex: 1;
     padding: 0 1rem;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .nav-section {
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
 }
 
-.nav-section-title {
+/* Accordion Styles */
+.nav-section-title-btn {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: transparent;
+    border: none;
+    padding: 0.75rem 0.5rem;
+    color: var(--color-text-muted);
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--color-text-muted);
-    margin: 0 0 0.75rem 0.5rem;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.nav-section-title-btn:hover {
+    color: var(--color-text-primary);
+}
+
+.chevron {
+    font-size: 0.625rem;
+    transition: transform 0.3s;
+}
+
+.chevron.open {
+    transform: rotate(180deg);
+}
+
+.nav-section-content {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.3s ease-out;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.nav-section-content.open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+}
+
+/* We need inner div for animation to work with unknown height */
+.nav-section-content>* {
+    min-height: 0;
+}
+
+/* But wait, we can't easily animate 'overflow' with direct children nav-items if we don't wrap them.
+   For simplicity, let's just toggle display or height if refined animation is tricky without wrapper.
+   Actually grid-template-rows is the modern trick. But we need a wrapper div.
+   Since I didn't add a wrapper div in TSX (I just listed NavLinks), let's adjust CSS or TSX.
+   Wait, in TSX I have <div className="nav-section-content"> <NavLink /> ... </div>. So that IS the wrapper.
+   So grid-template-rows applies to IT. But for it to animate height, it needs to have a child that expands.
+   We can just treat it as a standard flex block that hides.
+*/
+.nav-section-content {
+    display: none;
+    animation: slideDown 0.3s ease-out;
+}
+
+.nav-section-content.open {
+    display: flex;
+    flex-direction: column;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .nav-item {
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 0.875rem 1rem;
-    margin-bottom: 0.25rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.125rem;
     border-radius: var(--radius-md);
     color: var(--color-text-secondary);
     text-decoration: none;
     font-weight: 500;
     transition: all 0.2s ease;
     position: relative;
-    overflow: hidden;
-}
-
-.nav-item::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: var(--gradient-primary);
-    transform: scaleY(0);
-    transition: transform 0.2s ease;
 }
 
 .nav-item:hover {
@@ -98,29 +159,67 @@
     transform: translateX(4px);
 }
 
-.nav-item:hover .nav-icon {
-    transform: scale(1.2);
-}
-
 .nav-item.active {
     background: rgba(139, 92, 246, 0.15);
     color: var(--color-primary);
 }
 
-.nav-item.active::before {
-    transform: scaleY(1);
-}
-
 .nav-icon {
     font-size: 1.25rem;
-    transition: transform 0.2s ease;
     min-width: 1.25rem;
+    text-align: center;
 }
 
 .nav-label {
     flex: 1;
     font-size: 0.9375rem;
 }
+
+/* Mobile Toggle & Overlay */
+.mobile-toggle-btn {
+    display: none;
+    /* Hidden on desktop */
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 90;
+    /* Below sidebar (100) */
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+    padding: 0.5rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 1.5rem;
+    box-shadow: var(--shadow-md);
+}
+
+.mobile-close-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 1.25rem;
+    cursor: pointer;
+}
+
+.sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 99;
+    /* Below sidebar, above content */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s;
+}
+
+.sidebar-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
 
 /* Scrollbar styling */
 .sidebar-nav::-webkit-scrollbar {
@@ -136,6 +235,25 @@
     border-radius: 3px;
 }
 
-.sidebar-nav::-webkit-scrollbar-thumb:hover {
-    background: rgba(139, 92, 246, 0.5);
+/* Responsive Media Queries */
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+        width: 85%;
+        /* Slightly narrower than full screen, or 280px */
+        max-width: 300px;
+    }
+
+    .sidebar.mobile-open {
+        transform: translateX(0);
+        box-shadow: var(--shadow-xl);
+    }
+
+    .mobile-toggle-btn {
+        display: block;
+    }
+
+    .mobile-close-btn {
+        display: block;
+    }
 }

@@ -137,99 +137,158 @@ public class ShoppingListController : ControllerBase
         if (request.Items == null || !request.Items.Any())
             return BadRequest("Nenhum item para checkout");
 
+        // Validate Installments
+        var installments = request.InstallmentCount ?? 1;
+        if (installments > 1 && !request.CreditCardId.HasValue)
+        {
+            return BadRequest("Parcelamento disponível apenas para Cartão de Crédito.");
+        }
+
         // Calculate total
         var total = request.Items.Sum(i => i.Quantity * i.UnitPrice);
+        string description = request.Description ?? "Compras";
 
-        // Create transaction
-        var source = request.AccountId.HasValue
-            ? HomeOS.Domain.FinancialTypes.TransactionSource.NewFromAccount(request.AccountId.Value)
-            : HomeOS.Domain.FinancialTypes.TransactionSource.NewFromCreditCard(request.CreditCardId!.Value);
-
-        var transactionResult = HomeOS.Domain.FinancialTypes.TransactionModule.createExpense(
-            request.Description ?? "Compras",
-            total,
-            request.PurchaseDate,
-            request.CategoryId,
-            source
-        );
-
-        if (transactionResult.IsError)
-            return BadRequest(transactionResult.ErrorValue.ToString());
-
-        var transaction = transactionResult.ResultValue;
-        _transactionRepository.Save(transaction, userId);
-
-        // Process items
-        foreach (var checkoutItem in request.Items)
+        HomeOS.Domain.FinancialTypes.TransactionSource source;
+        if (request.AccountId.HasValue)
         {
-            var productId = checkoutItem.ProductId;
+            source = HomeOS.Domain.FinancialTypes.TransactionSource.NewFromAccount(request.AccountId.Value);
+        }
+        else if (request.CreditCardId.HasValue)
+        {
+            source = HomeOS.Domain.FinancialTypes.TransactionSource.NewFromCreditCard(request.CreditCardId.Value);
+        }
+        else
+        {
+            return BadRequest("Informe Conta ou Cartão de Crédito.");
+        }
 
-            // Handle ad-hoc items (create new product)
-            if (!productId.HasValue)
+        HomeOS.Domain.FinancialTypes.Transaction transactionToLink = null;
+
+        // Handle Transaction Creation (Single or Installments)
+        if (installments > 1 && request.CreditCardId.HasValue)
+        {
+            decimal installmentValue = Math.Floor(total / installments * 100) / 100;
+            decimal remainder = total - (installmentValue * installments);
+            var installmentId = Guid.NewGuid();
+
+            for (int i = 0; i < installments; i++)
             {
-                if (string.IsNullOrEmpty(checkoutItem.Name))
-                    return BadRequest("Nome do produto é obrigatório para novos itens");
+                decimal currentAmount = installmentValue + (i == 0 ? remainder : 0);
+                DateTime currentDueDate = request.PurchaseDate.AddMonths(i);
 
-                var unit = !string.IsNullOrEmpty(checkoutItem.Unit)
-                   ? UnitOfMeasureModule.fromString(checkoutItem.Unit)
-                   : Microsoft.FSharp.Core.FSharpOption<UnitOfMeasure>.None;
+                var installmentDesc = $"{description} ({i + 1}/{installments})";
 
-                var finalUnit = Microsoft.FSharp.Core.OptionModule.IsSome(unit) ? unit.Value : UnitOfMeasure.Unit;
-
-                var productResult = ProductModule.create(
-                    checkoutItem.Name,
-                    finalUnit,
-                    Microsoft.FSharp.Core.FSharpOption<Guid>.None, // Category
-                    Microsoft.FSharp.Core.FSharpOption<Guid>.None, // Group
-                    Microsoft.FSharp.Core.FSharpOption<string>.None // Barcode
+                var result = HomeOS.Domain.FinancialTypes.TransactionModule.createExpense(
+                    installmentDesc,
+                    currentAmount,
+                    currentDueDate,
+                    request.CategoryId,
+                    source
                 );
 
-                if (productResult.IsOk)
-                {
-                    var newProduct = productResult.ResultValue;
-                    _productRepository.Save(newProduct, userId);
-                    productId = newProduct.Id;
-                }
-                else
-                {
-                    return BadRequest($"Erro ao criar produto {checkoutItem.Name}: {productResult.ErrorValue}");
-                }
+                if (result.IsError) return BadRequest(result.ErrorValue.ToString());
+
+                var t = result.ResultValue;
+                // Add installment details
+                t = HomeOS.Domain.FinancialTypes.TransactionModule.addInstallmentDetails(t, installmentId, i + 1, installments);
+
+                _transactionRepository.Save(t, userId);
+
+                // Link relevant items to the FIRST transaction
+                if (i == 0) transactionToLink = t;
             }
+        }
+        else
+        {
+            // Single Transaction
+            var transactionResult = HomeOS.Domain.FinancialTypes.TransactionModule.createExpense(
+               description,
+               total,
+               request.PurchaseDate,
+               request.CategoryId,
+               source
+           );
 
-            // Create PurchaseItem
-            var supplierId = request.SupplierId.HasValue
-                ? Microsoft.FSharp.Core.FSharpOption<Guid>.Some(request.SupplierId.Value)
-                : Microsoft.FSharp.Core.FSharpOption<Guid>.None;
+            if (transactionResult.IsError)
+                return BadRequest(transactionResult.ErrorValue.ToString());
 
-            var purchaseItemResult = PurchaseItemModule.create(
-                productId.Value,
-                transaction.Id,
-                supplierId,
-                checkoutItem.Quantity,
-                checkoutItem.UnitPrice,
-                request.PurchaseDate
-            );
+            transactionToLink = transactionResult.ResultValue;
+            _transactionRepository.Save(transactionToLink, userId);
+        }
 
-            if (purchaseItemResult.IsOk)
+
+        // Process items (Linked to the first transaction/single transaction)
+        if (transactionToLink != null)
+        {
+            foreach (var checkoutItem in request.Items)
             {
-                var purchaseItem = purchaseItemResult.ResultValue;
-                _purchaseItemRepository.Save(purchaseItem, userId);
+                var productId = checkoutItem.ProductId;
 
-                // Update product stock and price
-                _productRepository.UpdateStock(productId.Value, userId, checkoutItem.Quantity);
-                _productRepository.UpdatePrice(productId.Value, userId, checkoutItem.UnitPrice);
-            }
+                // Handle ad-hoc items
+                if (!productId.HasValue)
+                {
+                    if (string.IsNullOrEmpty(checkoutItem.Name))
+                        return BadRequest("Nome do produto é obrigatório para novos itens");
 
-            // Mark shopping list item as purchased
-            if (checkoutItem.ShoppingListItemId.HasValue)
-            {
-                _shoppingListRepository.MarkAsPurchased(checkoutItem.ShoppingListItemId.Value, userId);
+                    var unit = !string.IsNullOrEmpty(checkoutItem.Unit)
+                       ? UnitOfMeasureModule.fromString(checkoutItem.Unit)
+                       : Microsoft.FSharp.Core.FSharpOption<UnitOfMeasure>.None;
+
+                    var finalUnit = Microsoft.FSharp.Core.OptionModule.IsSome(unit) ? unit.Value : UnitOfMeasure.Unit;
+
+                    var productResult = ProductModule.create(
+                        checkoutItem.Name,
+                        finalUnit,
+                        Microsoft.FSharp.Core.FSharpOption<Guid>.None,
+                        Microsoft.FSharp.Core.FSharpOption<Guid>.None,
+                        Microsoft.FSharp.Core.FSharpOption<string>.None
+                    );
+
+                    if (productResult.IsOk)
+                    {
+                        var newProduct = productResult.ResultValue;
+                        _productRepository.Save(newProduct, userId);
+                        productId = newProduct.Id;
+                    }
+                    else
+                    {
+                        return BadRequest($"Erro ao criar produto {checkoutItem.Name}: {productResult.ErrorValue}");
+                    }
+                }
+
+                // Create PurchaseItem
+                var supplierId = request.SupplierId.HasValue
+                    ? Microsoft.FSharp.Core.FSharpOption<Guid>.Some(request.SupplierId.Value)
+                    : Microsoft.FSharp.Core.FSharpOption<Guid>.None;
+
+                var purchaseItemResult = PurchaseItemModule.create(
+                    productId.Value,
+                    transactionToLink.Id,
+                    supplierId,
+                    checkoutItem.Quantity,
+                    checkoutItem.UnitPrice,
+                    request.PurchaseDate
+                );
+
+                if (purchaseItemResult.IsOk)
+                {
+                    var purchaseItem = purchaseItemResult.ResultValue;
+                    _purchaseItemRepository.Save(purchaseItem, userId);
+
+                    _productRepository.UpdateStock(productId.Value, userId, checkoutItem.Quantity);
+                    _productRepository.UpdatePrice(productId.Value, userId, checkoutItem.UnitPrice);
+                }
+
+                if (checkoutItem.ShoppingListItemId.HasValue)
+                {
+                    _shoppingListRepository.MarkAsPurchased(checkoutItem.ShoppingListItemId.Value, userId);
+                }
             }
         }
 
         return Ok(new
         {
-            TransactionId = transaction.Id,
+            TransactionId = transactionToLink?.Id,
             Total = total,
             ItemCount = request.Items.Count
         });
@@ -260,7 +319,8 @@ public record CheckoutRequest(
     Guid? CreditCardId,
     Guid? SupplierId,
     DateTime PurchaseDate,
-    string? Description
+    string? Description,
+    int? InstallmentCount
 );
 
 public record CheckoutItemRequest(

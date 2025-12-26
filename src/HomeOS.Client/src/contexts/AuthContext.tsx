@@ -31,7 +31,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (storedToken && storedUser) {
             setToken(storedToken);
-            setUser(JSON.parse(storedUser));
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
+            // Ensure userId is also stored separately (migration support)
+            if (!localStorage.getItem('userId') && parsedUser.id) {
+                localStorage.setItem('userId', parsedUser.id);
+            }
         }
     }, []);
 
@@ -40,6 +45,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(newUser);
         localStorage.setItem('token', newToken);
         localStorage.setItem('user', JSON.stringify(newUser));
+        localStorage.setItem('userId', newUser.id);
     };
 
     const logout = () => {
@@ -47,6 +53,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(null);
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('userId');
     };
 
     const isAuthenticated = !!token && !!user;

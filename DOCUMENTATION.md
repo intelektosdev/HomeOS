@@ -39,6 +39,10 @@ A gestão de transações foi totalmente refatorada para suportar o ciclo de vid
     - `Cancel`: Cancela transações pendentes/pagas informando motivo.
     - `Conciliate`: Finaliza o ciclo da transação.
     - `Update`: Permite alteração de dados básicos enquanto não conciliada.
+- **Usabilidade e Filtros (Novo)**:
+    - **Filtros Dinâmicos**: Capacidade de filtrar o extrato por Categoria e Conta específica.
+    - **Seleção de Período**: Navegação por Mês/Ano para visualização de dados históricos e futuros.
+    - **Interface Otimizada**: Barra de filtros rápida com reset instantâneo.
 
 ### B. Gestão de Cadastros (Auxiliares)
 - **Categorias (`Categories`)**: Tipos Receita/Despesa com suporte a ícones.
@@ -70,7 +74,10 @@ Módulo completo para gestão de estoque doméstico e compras.
     - **Fornecedores**: Gestão de contatos de compras.
     - **Lista de Compras**:
         - Adição de itens do estoque ou itens avulsos.
-        - **Finalização de Compra (Checkout)**: Gera automaticamente uma Transação Financeira (`Expense`) no valor total, permite criar produtos novos on-the-fly e atualiza o histórico.
+        - **Finalização de Compra (Checkout)**: 
+            - Gera automaticamente uma Transação Financeira (`Expense`) no valor total.
+            - **Suporte a Parcelamento**: Permite escolher entre pagamento via Conta ou Cartão de Crédito, com opção de parcelamento (1x a 12x) para compras no cartão.
+            - Criação de produtos novos on-the-fly e atualização automática de estoque e preços.
 
 ### E. Melhorias de UI/UX
 - **Visualização Híbrida (Grid/Cards)**:
@@ -192,7 +199,11 @@ Módulo completo para acompanhamento de patrimônio, gestão de ativos e anális
     - **Performance Anualizada**: Cálculo de taxa de retorno anualizada (Annualized Return) baseada no tempo de permanência no ativo.
     - **Projeções**: Estimativa de valor futuro para ativos de renda fixa baseada no Yield anual.
     - **Rendimentos Passivos**: Registro e histórico dedicado para Dividendos e Juros sobre Capital Próprio.
+    - **Integração Financeira Automática (Novo)**:
+        - Todas as operações de Compra, Venda e Recebimento de Dividendos geram automaticamente transações financeiras na conta vinculada.
+        - Criação automática de categorias de sistema ("Investimentos" e "Rendimentos") para correta classificação no extrato.
+        - Vínculo bidirecional entre a operação de investimento e o lançamento no extrato bancário.
 
 ---
-*Documentação atualizada em 2025-12-26*
+*Documentação atualizada em 2025-12-26 21:00*
 

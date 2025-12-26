@@ -1,13 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TransactionList } from '../components/TransactionList';
 import { TransactionForm } from '../components/TransactionForm';
-import type { TransactionResponse } from '../types';
-import { TransactionsService } from '../services/api';
+import type { TransactionResponse, CategoryResponse, AccountResponse } from '../types';
+import { TransactionsService, CategoriesService, AccountsService } from '../services/api';
 
 export function Transactions() {
     const [showForm, setShowForm] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState<TransactionResponse | undefined>(undefined);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    // Filter State
+    const [month, setMonth] = useState(new Date().getMonth() + 1);
+    const [year, setYear] = useState(new Date().getFullYear());
+    const [selectedCategoryId, setSelectedCategoryId] = useState('');
+    const [selectedAccountId, setSelectedAccountId] = useState('');
+
+    const [categories, setCategories] = useState<CategoryResponse[]>([]);
+    const [accounts, setAccounts] = useState<AccountResponse[]>([]);
+
+    useEffect(() => {
+        const loadFilters = async () => {
+            const [cats, accs] = await Promise.all([
+                CategoriesService.getAll(),
+                AccountsService.getAll()
+            ]);
+            setCategories(cats);
+            setAccounts(accs);
+        };
+        loadFilters();
+    }, []);
 
     const handleSuccess = () => {
         setShowForm(false);
@@ -79,6 +100,73 @@ export function Transactions() {
                 </button>
             </header>
 
+            {/* Filters */}
+            <div className="glass-panel" style={{ padding: '1rem', marginBottom: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <label style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>Período:</label>
+                    <select
+                        value={month}
+                        onChange={e => setMonth(Number(e.target.value))}
+                        className="form-input"
+                        style={{ width: 'auto', padding: '0.5rem' }}
+                    >
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                            <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('default', { month: 'long' })}</option>
+                        ))}
+                    </select>
+                    <input
+                        type="number"
+                        value={year}
+                        onChange={e => setYear(Number(e.target.value))}
+                        className="form-input"
+                        style={{ width: '80px', padding: '0.5rem' }}
+                    />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <label style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>Categoria:</label>
+                    <select
+                        value={selectedCategoryId}
+                        onChange={e => setSelectedCategoryId(e.target.value)}
+                        className="form-input"
+                        style={{ width: 'auto', minWidth: '150px', padding: '0.5rem' }}
+                    >
+                        <option value="">Todas</option>
+                        {categories.map(c => (
+                            <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <label style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>Conta:</label>
+                    <select
+                        value={selectedAccountId}
+                        onChange={e => setSelectedAccountId(e.target.value)}
+                        className="form-input"
+                        style={{ width: 'auto', minWidth: '150px', padding: '0.5rem' }}
+                    >
+                        <option value="">Todas</option>
+                        {accounts.map(a => (
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <button
+                    onClick={() => {
+                        setMonth(new Date().getMonth() + 1);
+                        setYear(new Date().getFullYear());
+                        setSelectedCategoryId('');
+                        setSelectedAccountId('');
+                    }}
+                    className="btn btn-secondary"
+                    style={{ marginLeft: 'auto', padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                >
+                    Limpar Filtros
+                </button>
+            </div>
+
             {showForm && (
                 <div style={{ marginBottom: '2rem' }}>
                     <TransactionForm
@@ -98,6 +186,12 @@ export function Transactions() {
                 onConciliate={handleConciliate}
                 onPay={handlePay}
                 refreshTrigger={refreshTrigger}
+                filters={{
+                    month,
+                    year,
+                    categoryId: selectedCategoryId || undefined,
+                    accountId: selectedAccountId || undefined
+                }}
             />
         </div>
     );

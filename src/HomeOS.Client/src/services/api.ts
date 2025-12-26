@@ -15,7 +15,9 @@ import type {
     CreditCardBalanceResponse,
     PendingTransaction,
     PayBillRequest,
-    PayBillResponse
+    PayBillResponse,
+    DebtStatistics,
+    PortfolioSummary
 } from '../types';
 
 export const api = axios.create({
@@ -108,10 +110,10 @@ export const CreditCardsService = {
 };
 
 export const TransactionsService = {
-    getAll: async (start?: string, end?: string) => {
+    getAll: async (start?: string, end?: string, categoryId?: string, accountId?: string) => {
         // start/end format: YYYY-MM-DD
         const response = await api.get<TransactionResponse[]>('/transactions', {
-            params: { start, end }
+            params: { start, end, categoryId, accountId }
         });
         return response.data;
     },
@@ -225,6 +227,7 @@ export interface CheckoutRequest {
     supplierId?: string;
     purchaseDate: string;
     description?: string;
+    installmentCount?: number;
 }
 
 export interface PurchaseItem {
@@ -460,10 +463,7 @@ export interface PayInstallmentRequest {
     transactionId?: string;
 }
 
-export interface DebtStatistics {
-    totalDebt: number;
-    activeDebtCount: number;
-}
+// DebtStatistics interface removed (imported from types)
 
 export const DebtsService = {
     getAll: async (onlyActive = false) => {
@@ -562,6 +562,7 @@ export interface CreateInvestmentRequest {
     investmentDate: string;
     maturityDate?: string;
     annualYield?: number;
+    linkedAccountId?: string;
 }
 
 export interface UpdateInvestmentRequest {
@@ -581,6 +582,13 @@ export interface BuySellRequest {
     fees?: number;
 }
 
+export interface DividendRequest {
+    userId: string;
+    amount: number;
+    date: string;
+    description?: string;
+}
+
 export interface InvestmentPerformance {
     currentValue: number;
     totalReturn: number;
@@ -589,21 +597,7 @@ export interface InvestmentPerformance {
     daysInvested: number;
 }
 
-export interface PortfolioSummary {
-    summary: {
-        totalInvestments: number;
-        totalInvested: number;
-        currentValue: number;
-        totalReturn: number;
-    };
-    byType: Array<{
-        investmentType: string;
-        count: number;
-        totalInvested: number;
-        currentValue: number;
-        totalReturn: number;
-    }>;
-}
+// PortfolioSummary interface removed (imported from types)
 
 export const InvestmentsService = {
     getAll: async (onlyActive = false) => {
@@ -642,6 +636,10 @@ export const InvestmentsService = {
         const response = await api.post<Investment>(`/investments/${id}/sell`, data);
         return response.data;
     },
+    registerDividend: async (id: string, data: DividendRequest) => {
+        const response = await api.post(`/investments/${id}/dividends`, data);
+        return response.data;
+    },
     getTransactions: async (id: string) => {
         const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
         const response = await api.get<InvestmentTransaction[]>(`/investments/${id}/transactions`, {
@@ -664,4 +662,129 @@ export const InvestmentsService = {
         return response.data;
     }
 };
+
+// ===== BUDGET SERVICES =====
+
+export interface Budget {
+    id: string;
+    userId: string;
+    name: string;
+    amountLimit: number;
+    periodType: string;
+    categoryId?: string;
+    alertThreshold: number;
+}
+
+export interface BudgetStatus {
+    budget: Budget;
+    spentAmount: number;
+    remainingAmount: number;
+    percentageUsed: number;
+    statusLevel: 'Normal' | 'Warning' | 'Critical';
+}
+
+export interface CreateBudgetRequest {
+    userId: string;
+    name: string;
+    amountLimit: number;
+    periodType: string;
+    categoryId?: string;
+    alertThreshold?: number;
+}
+
+export interface UpdateBudgetRequest {
+    userId: string;
+    name: string;
+    amountLimit: number;
+    alertThreshold?: number;
+}
+
+export const BudgetsService = {
+    getAll: async () => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        const response = await api.get<BudgetResponse[]>('/budgets', {
+            params: { userId }
+        });
+        return response.data;
+    },
+    getStatus: async (month?: number, year?: number) => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        const response = await api.get<BudgetStatusResponse[]>('/budgets/status', {
+            params: { userId, month, year }
+        });
+        return response.data;
+    },
+    create: async (data: CreateBudgetRequest) => {
+        const response = await api.post<BudgetResponse>('/budgets', data);
+        return response.data;
+    },
+    update: async (id: string, data: UpdateBudgetRequest) => {
+        const response = await api.put<BudgetResponse>(`/budgets/${id}`, data);
+        return response.data;
+    },
+    delete: async (id: string) => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        await api.delete(`/budgets/${id}`, {
+            params: { userId }
+        });
+    }
+};
+
+// Response Types for Budgets matching C# records
+export type BudgetResponse = Budget;
+export type BudgetStatusResponse = BudgetStatus;
+
+// ===== GOAL SERVICES =====
+
+export interface Goal {
+    id: string;
+    userId: string;
+    name: string;
+    targetAmount: number;
+    currentAmount: number;
+    deadline?: string;
+    status: string;
+    linkedInvestmentId?: string;
+}
+
+export interface CreateGoalRequest {
+    userId: string;
+    name: string;
+    targetAmount: number;
+    deadline?: string;
+    linkedInvestmentId?: string;
+}
+
+export interface DepositGoalRequest {
+    userId: string;
+    amount: number;
+    isIncremental?: boolean;
+}
+
+export const GoalsService = {
+    getAll: async () => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        const response = await api.get<GoalResponse[]>('/goals', {
+            params: { userId }
+        });
+        return response.data;
+    },
+    create: async (data: CreateGoalRequest) => {
+        const response = await api.post<GoalResponse>('/goals', data);
+        return response.data;
+    },
+    deposit: async (id: string, data: DepositGoalRequest) => {
+        const response = await api.post<GoalResponse>(`/goals/${id}/deposit`, data);
+        return response.data;
+    },
+    delete: async (id: string) => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        await api.delete(`/goals/${id}`, {
+            params: { userId }
+        });
+    }
+};
+
+export type GoalResponse = Goal;
+
 

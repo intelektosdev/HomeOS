@@ -5,6 +5,7 @@ import {
     AccountsService,
     CategoriesService,
     SuppliersService,
+    CreditCardsService,
     type ShoppingListItem,
     type Product,
     type Supplier,
@@ -12,7 +13,7 @@ import {
     type CheckoutRequest,
     type CheckoutItemRequest
 } from '../services/api';
-import type { CategoryResponse, AccountResponse } from '../types';
+import type { CategoryResponse, AccountResponse, CreditCardResponse } from '../types';
 
 interface CheckoutFormItem {
     shoppingListItemId: string;
@@ -26,6 +27,7 @@ export function ShoppingList() {
     const [items, setItems] = useState<ShoppingListItem[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [accounts, setAccounts] = useState<AccountResponse[]>([]);
+    const [creditCards, setCreditCards] = useState<CreditCardResponse[]>([]);
     const [categories, setCategories] = useState<CategoryResponse[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [loading, setLoading] = useState(true);
@@ -43,22 +45,27 @@ export function ShoppingList() {
     const [checkoutData, setCheckoutData] = useState({
         categoryId: '',
         accountId: '',
+        creditCardId: '',
+        paymentMethod: 'account' as 'account' | 'creditCard',
+        installments: 1,
         supplierId: '',
         description: 'Compras do mercado'
     });
 
     const loadData = async () => {
         try {
-            const [itemsData, productsData, accountsData, categoriesData, suppliersData] = await Promise.all([
+            const [itemsData, productsData, accountsData, creditCardsData, categoriesData, suppliersData] = await Promise.all([
                 ShoppingListService.getPending(),
                 ProductsService.getAll(),
                 AccountsService.getAll(),
+                CreditCardsService.getAll(),
                 CategoriesService.getAll(),
                 SuppliersService.getAll()
             ]);
             setItems(itemsData);
             setProducts(productsData);
             setAccounts(accountsData.filter(a => a.isActive));
+            setCreditCards(creditCardsData);
             setCategories(categoriesData.filter(c => c.type === 'Expense'));
             setSuppliers(suppliersData);
         } catch (error) {
@@ -120,10 +127,22 @@ export function ShoppingList() {
 
     const handleCheckout = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!checkoutData.categoryId || !checkoutData.accountId) {
-            alert('Selecione a categoria e a conta');
+
+        if (!checkoutData.categoryId) {
+            alert('Selecione a categoria');
             return;
         }
+
+        if (checkoutData.paymentMethod === 'account' && !checkoutData.accountId) {
+            alert('Selecione a conta');
+            return;
+        }
+
+        if (checkoutData.paymentMethod === 'creditCard' && !checkoutData.creditCardId) {
+            alert('Selecione o cartão de crédito');
+            return;
+        }
+
         if (checkoutItems.some(i => i.unitPrice <= 0)) {
             alert('Informe o preço de todos os itens');
             return;
@@ -141,7 +160,9 @@ export function ShoppingList() {
             const request: CheckoutRequest = {
                 items,
                 categoryId: checkoutData.categoryId,
-                accountId: checkoutData.accountId,
+                accountId: checkoutData.paymentMethod === 'account' ? checkoutData.accountId : undefined,
+                creditCardId: checkoutData.paymentMethod === 'creditCard' ? checkoutData.creditCardId : undefined,
+                installmentCount: checkoutData.paymentMethod === 'creditCard' ? checkoutData.installments : 1,
                 supplierId: checkoutData.supplierId || undefined,
                 purchaseDate: new Date().toISOString(),
                 description: checkoutData.description
@@ -282,19 +303,62 @@ export function ShoppingList() {
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Conta</label>
+                                <label className="form-label">Forma de Pagamento</label>
                                 <select
                                     className="form-input"
-                                    value={checkoutData.accountId}
-                                    onChange={(e) => setCheckoutData({ ...checkoutData, accountId: e.target.value })}
-                                    required
+                                    value={checkoutData.paymentMethod}
+                                    onChange={(e) => setCheckoutData({ ...checkoutData, paymentMethod: e.target.value as any })}
                                 >
-                                    <option value="">Selecionar...</option>
-                                    {accounts.map(acc => (
-                                        <option key={acc.id} value={acc.id}>{acc.name}</option>
-                                    ))}
+                                    <option value="account">Conta</option>
+                                    <option value="creditCard">Cartão de Crédito</option>
                                 </select>
                             </div>
+
+                            {checkoutData.paymentMethod === 'account' ? (
+                                <div className="form-group">
+                                    <label className="form-label">Conta</label>
+                                    <select
+                                        className="form-input"
+                                        value={checkoutData.accountId}
+                                        onChange={(e) => setCheckoutData({ ...checkoutData, accountId: e.target.value })}
+                                        required
+                                    >
+                                        <option value="">Selecionar...</option>
+                                        {accounts.map(acc => (
+                                            <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="form-group">
+                                        <label className="form-label">Cartão</label>
+                                        <select
+                                            className="form-input"
+                                            value={checkoutData.creditCardId}
+                                            onChange={(e) => setCheckoutData({ ...checkoutData, creditCardId: e.target.value })}
+                                            required
+                                        >
+                                            <option value="">Selecionar...</option>
+                                            {creditCards.map(card => (
+                                                <option key={card.id} value={card.id}>{card.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Parcelas</label>
+                                        <select
+                                            className="form-input"
+                                            value={checkoutData.installments}
+                                            onChange={(e) => setCheckoutData({ ...checkoutData, installments: Number(e.target.value) })}
+                                        >
+                                            {[...Array(12)].map((_, i) => (
+                                                <option key={i + 1} value={i + 1}>{i + 1}x</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </>
+                            )}
                             <div className="form-group">
                                 <label className="form-label">Fornecedor</label>
                                 <select

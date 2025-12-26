@@ -192,3 +192,28 @@ export interface RecurringTransactionResponse {
     lastGeneratedAt?: string;
 }
 
+// --- DEBTS ---
+
+export interface DebtStatistics {
+    totalDebt: number;
+    activeDebtCount: number;
+}
+
+// --- INVESTMENTS ---
+
+export interface PortfolioSummary {
+    summary: {
+        TotalInvestments: number;
+        TotalInvested: number;
+        CurrentValue: number;
+        TotalReturn: number;
+    };
+    byType: Array<{
+        InvestmentType: string;
+        Count: number;
+        TotalInvested: number;
+        CurrentValue: number;
+        TotalReturn: number;
+    }>;
+}
+

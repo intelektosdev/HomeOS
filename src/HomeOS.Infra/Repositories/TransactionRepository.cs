@@ -66,9 +66,9 @@ public class TransactionRepository(IConfiguration configuration)
         return TransactionMapper.ToDomain(dbModel);
     }
 
-    public IEnumerable<dynamic> GetStatement(DateTime startDate, DateTime endDate, Guid userId)
+    public IEnumerable<dynamic> GetStatement(DateTime startDate, DateTime endDate, Guid userId, Guid? categoryId = null, Guid? accountId = null)
     {
-        const string sql = @"
+        var sql = @"
         SELECT 
             Id, Description, Amount, DueDate, CategoryId, AccountId, CreditCardId, BillPaymentId,
             CASE 
@@ -78,11 +78,31 @@ public class TransactionRepository(IConfiguration configuration)
                 WHEN StatusId = 4 THEN 'Cancelled'
             END as Status
         FROM [Finance].[Transactions]
-        WHERE DueDate BETWEEN @StartDate AND @EndDate AND UserId = @UserId
-        ORDER BY DueDate ASC";
+        WHERE DueDate BETWEEN @StartDate AND @EndDate AND UserId = @UserId";
+
+        if (categoryId.HasValue)
+        {
+            sql += " AND CategoryId = @CategoryId";
+        }
+
+        if (accountId.HasValue)
+        {
+            // Filter primarily by AccountId, but also check transactions Paid via CreditCard that are linked to this account via BillPayment? 
+            // For now, let's keep it simple: Filter where AccountId matches (Debit) OR where CreditCard payment is made from this account (CreditCardPayment)
+            // Actually, for a simple transaction list filter, we usually mean "Transactions that affected this account".
+            // Direct Account Transactions: AccountId = @AccountId
+            // Credit Card Transactions: CreditCardId is not NULL (This filter might be tricky if mixed. Let's assume the user wants to see 'Debit' transactions from this account).
+
+            // Re-reading requirements: "Visualizar dados de diferentes periodos" + "Filtros".
+            // If I select "Nubank Account", I expect to see expenses paid with "Nubank Account".
+
+            sql += " AND AccountId = @AccountId";
+        }
+
+        sql += " ORDER BY DueDate ASC";
 
         using var connection = new SqlConnection(_connectionString);
-        return connection.Query(sql, new { StartDate = startDate, EndDate = endDate, UserId = userId });
+        return connection.Query(sql, new { StartDate = startDate, EndDate = endDate, UserId = userId, CategoryId = categoryId, AccountId = accountId });
     }
 
     /// <summary>

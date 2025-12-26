@@ -1,4 +1,5 @@
 using HomeOS.Domain.InvestmentTypes;
+using HomeOS.Domain.FinancialTypes;
 using HomeOS.Infra.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.FSharp.Core;
@@ -10,10 +11,55 @@ namespace HomeOS.Api.Controllers;
 public class InvestmentController : ControllerBase
 {
     private readonly InvestmentRepository _repository;
+    private readonly TransactionRepository _transactionRepository;
+    private readonly CategoryRepository _categoryRepository;
 
-    public InvestmentController(IConfiguration config)
+    public InvestmentController(InvestmentRepository repository, TransactionRepository transactionRepository, CategoryRepository categoryRepository)
     {
-        _repository = new InvestmentRepository(config);
+        _repository = repository;
+        _transactionRepository = transactionRepository;
+        _categoryRepository = categoryRepository;
+    }
+
+
+    private Guid? RegisterFinancialTransaction(Guid userId, string description, decimal amount, DateTime date, Guid accountId, TransactionType type)
+    {
+        var categoryName = type == TransactionType.Expense ? "Investimentos" : "Rendimentos";
+        var categories = _categoryRepository.GetAll(userId);
+        var category = categories.FirstOrDefault(c => c.Name == categoryName && c.Type == type);
+
+        if (category == null)
+        {
+            category = CategoryModule.create(categoryName, type, FSharpOption<string>.None);
+            _categoryRepository.Save(category, userId);
+        }
+
+        var source = TransactionSource.NewFromAccount(accountId);
+        var result = TransactionModule.createExpense(description, amount, date, category.Id, source);
+
+        if (result.IsOk)
+        {
+            var transaction = result.ResultValue;
+
+            if (type == TransactionType.Income)
+            {
+                transaction = new Transaction(
+                transaction.Id, transaction.Description, TransactionType.Income, transaction.Status,
+                transaction.Amount, transaction.DueDate, transaction.CreatedAt, transaction.CategoryId, transaction.Source,
+                transaction.BillPaymentId, transaction.InstallmentId, transaction.InstallmentNumber, transaction.TotalInstallments
+            );
+            }
+
+            var payResult = TransactionModule.pay(transaction, date);
+            if (payResult.IsOk)
+            {
+                transaction = payResult.ResultValue;
+            }
+
+            _transactionRepository.Save(transaction, userId);
+            return transaction.Id;
+        }
+        return null;
     }
 
     [HttpGet]
@@ -66,36 +112,52 @@ public class InvestmentController : ControllerBase
         if (result.IsOk)
         {
             var investment = result.ResultValue;
+            investment = UpdateOptionalFields(investment, request);
 
-            // Atualizar campos opcionais se fornecidos
-            if (request.MaturityDate.HasValue || request.AnnualYield.HasValue)
+            // Register Financial Transaction if LinkedAccountId is present
+            if (request.LinkedAccountId.HasValue)
             {
-                var maturityDate = request.MaturityDate.HasValue
-                    ? FSharpOption<DateTime>.Some(request.MaturityDate.Value)
-                    : FSharpOption<DateTime>.None;
+                var linkResult = InvestmentModule.update(investment, investment.Name, investment.CurrentPrice, investment.AnnualYield,
+                    FSharpOption<Guid>.Some(request.LinkedAccountId.Value), investment.Notes);
 
-                var annualYield = request.AnnualYield.HasValue
-                    ? FSharpOption<decimal>.Some(request.AnnualYield.Value)
-                    : FSharpOption<decimal>.None;
+                if (linkResult.IsOk)
+                {
+                    investment = linkResult.ResultValue;
 
-                var updatedInvestment = new Investment(
-                    investment.Id, investment.UserId, investment.Name, investment.Type,
-                    investment.InitialAmount, investment.CurrentQuantity, investment.AveragePrice,
-                    investment.CurrentPrice, investment.InvestmentDate, maturityDate, annualYield,
-                    investment.Status, investment.LinkedAccountId, investment.Notes
-                );
-
-                _repository.Save(updatedInvestment);
-                return CreatedAtAction(nameof(GetById), new { id = investment.Id, userId = investment.UserId }, ToResponse(updatedInvestment));
+                    RegisterFinancialTransaction(request.UserId, $"Investimento: {request.Name}",
+                        request.InitialAmount, request.InvestmentDate, request.LinkedAccountId.Value, TransactionType.Expense);
+                }
             }
-            else
-            {
-                _repository.Save(investment);
-                return CreatedAtAction(nameof(GetById), new { id = investment.Id, userId = investment.UserId }, ToResponse(investment));
-            }
+
+            _repository.Save(investment);
+
+            return CreatedAtAction(nameof(GetById), new { id = investment.Id, userId = investment.UserId }, ToResponse(investment));
         }
 
         return BadRequest(new { error = result.ErrorValue.ToString() });
+    }
+
+    // Helper to handle optional fields from create request
+    private Investment UpdateOptionalFields(Investment investment, CreateInvestmentRequest request)
+    {
+        if (request.MaturityDate.HasValue || request.AnnualYield.HasValue)
+        {
+            var maturityDate = request.MaturityDate.HasValue
+                ? FSharpOption<DateTime>.Some(request.MaturityDate.Value)
+                : FSharpOption<DateTime>.None;
+
+            var annualYield = request.AnnualYield.HasValue
+                ? FSharpOption<decimal>.Some(request.AnnualYield.Value)
+                : FSharpOption<decimal>.None;
+
+            return new Investment(
+                investment.Id, investment.UserId, investment.Name, investment.Type,
+                investment.InitialAmount, investment.CurrentQuantity, investment.AveragePrice,
+                investment.CurrentPrice, investment.InvestmentDate, maturityDate, annualYield,
+                investment.Status, investment.LinkedAccountId, investment.Notes
+            );
+        }
+        return investment;
     }
 
     [HttpPut("{id}")]
@@ -158,6 +220,14 @@ public class InvestmentController : ControllerBase
             var updatedInvestment = result.ResultValue;
             _repository.Save(updatedInvestment);
 
+            Guid? financialTransactionId = null;
+            if (investment.LinkedAccountId != null && FSharpOption<Guid>.get_IsSome(investment.LinkedAccountId))
+            {
+                financialTransactionId = RegisterFinancialTransaction(request.UserId, $"Aporte: {investment.Name}",
+                    (request.Quantity * request.UnitPrice) + (request.Fees ?? 0),
+                    request.Date, investment.LinkedAccountId.Value, TransactionType.Expense);
+            }
+
             // Registrar transação
             var transaction = new InvestmentTransaction(
                 Guid.NewGuid(),
@@ -168,7 +238,7 @@ public class InvestmentController : ControllerBase
                 request.UnitPrice,
                 request.Quantity * request.UnitPrice,
                 request.Fees ?? 0m,
-                FSharpOption<Guid>.None
+                financialTransactionId.HasValue ? FSharpOption<Guid>.Some(financialTransactionId.Value) : FSharpOption<Guid>.None
             );
             _repository.SaveTransaction(transaction);
 
@@ -191,6 +261,18 @@ public class InvestmentController : ControllerBase
             var updatedInvestment = result.ResultValue;
             _repository.Save(updatedInvestment);
 
+            Guid? financialTransactionId = null;
+            if (investment.LinkedAccountId != null && FSharpOption<Guid>.get_IsSome(investment.LinkedAccountId))
+            {
+                // Sell Net Amount = (Qty * Price) - Fees
+                var netAmount = (request.Quantity * request.UnitPrice) - (request.Fees ?? 0);
+                if (netAmount > 0)
+                {
+                    financialTransactionId = RegisterFinancialTransaction(request.UserId, $"Venda: {investment.Name}",
+                        netAmount, request.Date, investment.LinkedAccountId.Value, TransactionType.Income);
+                }
+            }
+
             // Registrar transação
             var transaction = new InvestmentTransaction(
                 Guid.NewGuid(),
@@ -201,7 +283,7 @@ public class InvestmentController : ControllerBase
                 request.UnitPrice,
                 request.Quantity * request.UnitPrice,
                 request.Fees ?? 0m,
-                FSharpOption<Guid>.None
+                financialTransactionId.HasValue ? FSharpOption<Guid>.Some(financialTransactionId.Value) : FSharpOption<Guid>.None
             );
             _repository.SaveTransaction(transaction);
 
@@ -209,6 +291,34 @@ public class InvestmentController : ControllerBase
         }
 
         return BadRequest(new { error = result.ErrorValue.ToString() });
+    }
+
+    [HttpPost("{id}/dividends")]
+    public IActionResult RegisterDividend(Guid id, [FromBody] DividendRequest request)
+    {
+        var investment = _repository.GetById(id, request.UserId);
+        if (investment == null) return NotFound();
+
+        var transaction = InvestmentModule.recordDividend(investment, request.Amount, request.Date);
+
+        Guid? financialTransactionId = null;
+        if (investment.LinkedAccountId != null && FSharpOption<Guid>.get_IsSome(investment.LinkedAccountId))
+        {
+            financialTransactionId = RegisterFinancialTransaction(request.UserId, $"Dividendos: {investment.Name} {request.Description ?? ""}",
+                request.Amount, request.Date, investment.LinkedAccountId.Value, TransactionType.Income);
+        }
+
+        if (financialTransactionId.HasValue)
+        {
+            transaction = new InvestmentTransaction(
+                transaction.Id, transaction.InvestmentId, transaction.Type, transaction.Date,
+                transaction.Quantity, transaction.UnitPrice, transaction.TotalAmount, transaction.Fees,
+                FSharpOption<Guid>.Some(financialTransactionId.Value)
+            );
+        }
+
+        _repository.SaveTransaction(transaction);
+        return Ok(transaction);
     }
 
     [HttpGet("{id}/transactions")]
@@ -340,7 +450,8 @@ public record CreateInvestmentRequest(
     decimal UnitPrice,
     DateTime InvestmentDate,
     DateTime? MaturityDate,
-    decimal? AnnualYield
+    decimal? AnnualYield,
+    Guid? LinkedAccountId
 );
 
 public record UpdateInvestmentRequest(
@@ -358,4 +469,11 @@ public record BuySellRequest(
     decimal UnitPrice,
     DateTime Date,
     decimal? Fees
+);
+
+public record DividendRequest(
+    Guid UserId,
+    decimal Amount,
+    DateTime Date,
+    string? Description
 );

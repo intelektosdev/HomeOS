@@ -12,6 +12,7 @@
     <Compile Include="InventoryTypes.fs" />
     <Compile Include="DebtTypes.fs" />
     <Compile Include="InvestmentTypes.fs" />
+    <Compile Include="GoalBudgetTypes.fs" />
   </ItemGroup>
 
 </Project>

@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import { InvestmentsService } from '../services/api';
-import type { Investment, CreateInvestmentRequest, InvestmentPerformance, PortfolioSummary } from '../services/api';
+import { InvestmentsService, AccountsService } from '../services/api';
+import type { Investment, CreateInvestmentRequest, InvestmentPerformance } from '../services/api';
+import type { PortfolioSummary, AccountResponse } from '../types';
 
 type ViewMode = 'cards' | 'table';
 
 export function Investments() {
     const [investments, setInvestments] = useState<Investment[]>([]);
+    const [accounts, setAccounts] = useState<AccountResponse[]>([]); // New State
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [viewMode, setViewMode] = useState<ViewMode>('cards');
     const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
-    const [selectedInvestment, setSelectedInvestment] = useState<string | null>(null);
+
     const [performance, setPerformance] = useState<InvestmentPerformance | null>(null);
     const [showPerformance, setShowPerformance] = useState(false);
 
@@ -21,17 +23,22 @@ export function Investments() {
         initialAmount: 0,
         quantity: 0,
         unitPrice: 0,
-        investmentDate: new Date().toISOString().split('T')[0]
+        investmentDate: new Date().toISOString().split('T')[0],
+        linkedAccountId: '' // Default empty
     });
 
     const loadInvestments = async () => {
         try {
-            const data = await InvestmentsService.getAll(false);
+            const [data, portfolioData, accountsData] = await Promise.all([
+                InvestmentsService.getAll(false),
+                InvestmentsService.getPortfolio(),
+                AccountsService.getAll()
+            ]);
             setInvestments(data);
-            const portfolioData = await InvestmentsService.getPortfolio();
             setPortfolio(portfolioData);
+            setAccounts(accountsData);
         } catch (error) {
-            console.error('Erro ao carregar investimentos', error);
+            console.error('Erro ao carregar dados', error);
         } finally {
             setLoading(false);
         }
@@ -83,7 +90,7 @@ export function Investments() {
         try {
             const perf = await InvestmentsService.getPerformance(investmentId);
             setPerformance(perf);
-            setSelectedInvestment(investmentId);
+
             setShowPerformance(true);
         } catch (error) {
             console.error('Erro ao carregar performance', error);
@@ -167,20 +174,20 @@ export function Investments() {
                         <div className="stats-summary">
                             <div className="stat-item">
                                 <span className="stat-label">Total Investido</span>
-                                <span className="stat-value">{formatCurrency(portfolio.summary.totalInvested)}</span>
+                                <span className="stat-value">{formatCurrency(portfolio.summary.TotalInvested)}</span>
                             </div>
                             <div className="stat-item">
                                 <span className="stat-label">Valor Atual</span>
                                 <span className="stat-value" style={{ color: '#4CAF50' }}>
-                                    {formatCurrency(portfolio.summary.currentValue)}
+                                    {formatCurrency(portfolio.summary.CurrentValue)}
                                 </span>
                             </div>
                             <div className="stat-item">
                                 <span className="stat-label">Rentabilidade</span>
                                 <span className="stat-value">
                                     {formatPercentage(
-                                        portfolio.summary.totalInvested > 0
-                                            ? (portfolio.summary.totalReturn / portfolio.summary.totalInvested) * 100
+                                        portfolio.summary.TotalInvested > 0
+                                            ? (portfolio.summary.TotalReturn / portfolio.summary.TotalInvested) * 100
                                             : 0
                                     )}
                                 </span>
@@ -344,6 +351,24 @@ export function Investments() {
                             </div>
                         </div>
 
+                        <div className="form-group">
+                            <label className="form-label">Conta de Saída (Opcional)</label>
+                            <select
+                                className="form-input"
+                                value={formData.linkedAccountId}
+                                onChange={(e) => setFormData({ ...formData, linkedAccountId: e.target.value })}
+                            >
+                                <option value="">Selecione uma conta...</option>
+                                {accounts.map(acc => (
+                                    <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                ))}
+                            </select>
+                            <small style={{ opacity: 0.6, marginTop: '0.25rem', display: 'block' }}>
+                                Ao selecionar uma conta, uma despesa será criada automaticamente.
+                            </small>
+                        </div>
+
+
                         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                             <button type="submit" className="btn btn-primary">
                                 Cadastrar Investimento
@@ -353,194 +378,199 @@ export function Investments() {
                             </button>
                         </div>
                     </form>
-                </div>
-            )}
+                </div >
+            )
+            }
 
-            {viewMode === 'cards' ? (
-                <div className="accounts-grid">
-                    {investments.length === 0 ? (
-                        <div className="glass-panel">
-                            <p className="empty-state">Nenhum investimento cadastrado. Cadastre seu primeiro investimento!</p>
-                        </div>
-                    ) : (
-                        investments.map(inv => (
-                            <div key={inv.id} className="account-card glass-panel">
-                                <div className="account-header">
-                                    <span className="account-icon" style={{ fontSize: '2rem' }}>
-                                        {getTypeIcon(inv.type)}
-                                    </span>
-                                    <div className="account-info">
-                                        <h3 className="account-name">{inv.name}</h3>
-                                        <p className="account-type">{getTypeLabel(inv.type)}</p>
-                                        <small style={{ opacity: 0.7 }}>
-                                            {new Date(inv.investmentDate).toLocaleDateString('pt-BR')}
-                                        </small>
-                                    </div>
-                                </div>
-
-                                <div className="account-balance">
-                                    <div>
-                                        <span className="balance-label">Investido</span>
-                                        <span className="balance-value">{formatCurrency(inv.initialAmount)}</span>
-                                    </div>
-                                    <div>
-                                        <span className="balance-label">Valor Atual</span>
-                                        <span className="balance-value" style={{ color: '#4CAF50' }}>
-                                            {formatCurrency(calculateCurrentValue(inv))}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                        <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Rentabilidade</span>
-                                        <span>{formatPercentage(calculateReturnPercentage(inv))}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Lucro/Prejuízo</span>
-                                        <span style={{
-                                            color: calculateReturn(inv) >= 0 ? '#4CAF50' : '#f44336',
-                                            fontWeight: 'bold'
-                                        }}>
-                                            {formatCurrency(calculateReturn(inv))}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="account-actions">
-                                    <button
-                                        className="btn-edit"
-                                        onClick={() => handleViewPerformance(inv.id)}
-                                        title="Ver performance detalhada"
-                                    >
-                                        📊 Performance
-                                    </button>
-                                    <button
-                                        className="btn-toggle btn-deactivate"
-                                        onClick={() => handleDelete(inv.id)}
-                                    >
-                                        🗑️ Excluir
-                                    </button>
-                                </div>
+            {
+                viewMode === 'cards' ? (
+                    <div className="accounts-grid">
+                        {investments.length === 0 ? (
+                            <div className="glass-panel">
+                                <p className="empty-state">Nenhum investimento cadastrado. Cadastre seu primeiro investimento!</p>
                             </div>
-                        ))
-                    )}
-                </div>
-            ) : (
-                <div className="accounts-table glass-panel">
-                    {investments.length === 0 ? (
-                        <p className="empty-state">Nenhum investimento cadastrado.</p>
-                    ) : (
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Investimento</th>
-                                    <th>Tipo</th>
-                                    <th>Investido</th>
-                                    <th>Valor Atual</th>
-                                    <th>Rentabilidade</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {investments.map(inv => (
-                                    <tr key={inv.id}>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                <span style={{ fontSize: '1.5rem' }}>{getTypeIcon(inv.type)}</span>
-                                                <strong>{inv.name}</strong>
-                                            </div>
-                                        </td>
-                                        <td>{getTypeLabel(inv.type)}</td>
-                                        <td>
-                                            <span className="amount-value">{formatCurrency(inv.initialAmount)}</span>
-                                        </td>
-                                        <td>
-                                            <span className="amount-value" style={{ color: '#4CAF50' }}>
+                        ) : (
+                            investments.map(inv => (
+                                <div key={inv.id} className="account-card glass-panel">
+                                    <div className="account-header">
+                                        <span className="account-icon" style={{ fontSize: '2rem' }}>
+                                            {getTypeIcon(inv.type)}
+                                        </span>
+                                        <div className="account-info">
+                                            <h3 className="account-name">{inv.name}</h3>
+                                            <p className="account-type">{getTypeLabel(inv.type)}</p>
+                                            <small style={{ opacity: 0.7 }}>
+                                                {new Date(inv.investmentDate).toLocaleDateString('pt-BR')}
+                                            </small>
+                                        </div>
+                                    </div>
+
+                                    <div className="account-balance">
+                                        <div>
+                                            <span className="balance-label">Investido</span>
+                                            <span className="balance-value">{formatCurrency(inv.initialAmount)}</span>
+                                        </div>
+                                        <div>
+                                            <span className="balance-label">Valor Atual</span>
+                                            <span className="balance-value" style={{ color: '#4CAF50' }}>
                                                 {formatCurrency(calculateCurrentValue(inv))}
                                             </span>
-                                        </td>
-                                        <td>{formatPercentage(calculateReturnPercentage(inv))}</td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                <button
-                                                    className="btn-toggle-small"
-                                                    onClick={() => handleViewPerformance(inv.id)}
-                                                    title="Ver performance"
-                                                >
-                                                    📊
-                                                </button>
-                                                <button
-                                                    className="btn-toggle-small btn-deactivate"
-                                                    onClick={() => handleDelete(inv.id)}
-                                                    title="Excluir"
-                                                >
-                                                    🗑️
-                                                </button>
-                                            </div>
-                                        </td>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                            <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Rentabilidade</span>
+                                            <span>{formatPercentage(calculateReturnPercentage(inv))}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Lucro/Prejuízo</span>
+                                            <span style={{
+                                                color: calculateReturn(inv) >= 0 ? '#4CAF50' : '#f44336',
+                                                fontWeight: 'bold'
+                                            }}>
+                                                {formatCurrency(calculateReturn(inv))}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="account-actions">
+                                        <button
+                                            className="btn-edit"
+                                            onClick={() => handleViewPerformance(inv.id)}
+                                            title="Ver performance detalhada"
+                                        >
+                                            📊 Performance
+                                        </button>
+                                        <button
+                                            className="btn-toggle btn-deactivate"
+                                            onClick={() => handleDelete(inv.id)}
+                                        >
+                                            🗑️ Excluir
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                ) : (
+                    <div className="accounts-table glass-panel">
+                        {investments.length === 0 ? (
+                            <p className="empty-state">Nenhum investimento cadastrado.</p>
+                        ) : (
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Investimento</th>
+                                        <th>Tipo</th>
+                                        <th>Investido</th>
+                                        <th>Valor Atual</th>
+                                        <th>Rentabilidade</th>
+                                        <th>Ações</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-            )}
+                                </thead>
+                                <tbody>
+                                    {investments.map(inv => (
+                                        <tr key={inv.id}>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                    <span style={{ fontSize: '1.5rem' }}>{getTypeIcon(inv.type)}</span>
+                                                    <strong>{inv.name}</strong>
+                                                </div>
+                                            </td>
+                                            <td>{getTypeLabel(inv.type)}</td>
+                                            <td>
+                                                <span className="amount-value">{formatCurrency(inv.initialAmount)}</span>
+                                            </td>
+                                            <td>
+                                                <span className="amount-value" style={{ color: '#4CAF50' }}>
+                                                    {formatCurrency(calculateCurrentValue(inv))}
+                                                </span>
+                                            </td>
+                                            <td>{formatPercentage(calculateReturnPercentage(inv))}</td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <button
+                                                        className="btn-toggle-small"
+                                                        onClick={() => handleViewPerformance(inv.id)}
+                                                        title="Ver performance"
+                                                    >
+                                                        📊
+                                                    </button>
+                                                    <button
+                                                        className="btn-toggle-small btn-deactivate"
+                                                        onClick={() => handleDelete(inv.id)}
+                                                        title="Excluir"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                )
+            }
 
             {/* Modal de Performance Detalhada */}
-            {showPerformance && performance && (
-                <div className="modal-overlay" onClick={() => setShowPerformance(false)}>
-                    <div className="modal-content glass-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
-                        <div className="modal-header">
-                            <h2>📊 Performance Detalhada</h2>
-                            <button className="modal-close" onClick={() => setShowPerformance(false)}>✕</button>
-                        </div>
-                        <div style={{ padding: '1rem' }}>
-                            <div style={{ display: 'grid', gap: '1.5rem' }}>
-                                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                                    <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Valor Atual</span>
-                                    <h2 style={{ color: '#4CAF50', margin: '0.5rem 0' }}>
-                                        {formatCurrency(performance.currentValue)}
-                                    </h2>
-                                </div>
+            {
+                showPerformance && performance && (
+                    <div className="modal-overlay" onClick={() => setShowPerformance(false)}>
+                        <div className="modal-content glass-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+                            <div className="modal-header">
+                                <h2>📊 Performance Detalhada</h2>
+                                <button className="modal-close" onClick={() => setShowPerformance(false)}>✕</button>
+                            </div>
+                            <div style={{ padding: '1rem' }}>
+                                <div style={{ display: 'grid', gap: '1.5rem' }}>
+                                    <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                                        <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Valor Atual</span>
+                                        <h2 style={{ color: '#4CAF50', margin: '0.5rem 0' }}>
+                                            {formatCurrency(performance.currentValue)}
+                                        </h2>
+                                    </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                    <div>
-                                        <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Retorno Total</span>
-                                        <h3 style={{
-                                            color: performance.totalReturn >= 0 ? '#4CAF50' : '#f44336',
-                                            marginTop: '0.5rem'
-                                        }}>
-                                            {formatCurrency(performance.totalReturn)}
-                                        </h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                        <div>
+                                            <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Retorno Total</span>
+                                            <h3 style={{
+                                                color: performance.totalReturn >= 0 ? '#4CAF50' : '#f44336',
+                                                marginTop: '0.5rem'
+                                            }}>
+                                                {formatCurrency(performance.totalReturn)}
+                                            </h3>
+                                        </div>
+                                        <div>
+                                            <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Rentabilidade</span>
+                                            <h3 style={{ marginTop: '0.5rem' }}>
+                                                {formatPercentage(performance.returnPercentage)}
+                                            </h3>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Rentabilidade</span>
-                                        <h3 style={{ marginTop: '0.5rem' }}>
-                                            {formatPercentage(performance.returnPercentage)}
-                                        </h3>
-                                    </div>
-                                </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                    <div>
-                                        <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Rent. Anualizada</span>
-                                        <h3 style={{ marginTop: '0.5rem' }}>
-                                            {formatPercentage(performance.annualizedReturn)}
-                                        </h3>
-                                    </div>
-                                    <div>
-                                        <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Dias Investidos</span>
-                                        <h3 style={{ marginTop: '0.5rem' }}>
-                                            {performance.daysInvested} dias
-                                        </h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                        <div>
+                                            <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Rent. Anualizada</span>
+                                            <h3 style={{ marginTop: '0.5rem' }}>
+                                                {formatPercentage(performance.annualizedReturn)}
+                                            </h3>
+                                        </div>
+                                        <div>
+                                            <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Dias Investidos</span>
+                                            <h3 style={{ marginTop: '0.5rem' }}>
+                                                {performance.daysInvested} dias
+                                            </h3>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

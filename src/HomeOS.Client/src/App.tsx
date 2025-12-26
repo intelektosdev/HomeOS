@@ -15,6 +15,8 @@ import { Suppliers } from './pages/Suppliers';
 import { RecurringTransactions } from './pages/RecurringTransactions';
 import { Debts } from './pages/Debts';
 import { Investments } from './pages/Investments';
+import { Budgets } from './pages/Budgets';
+import { Goals } from './pages/Goals';
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -165,6 +167,26 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Investments />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/budgets"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Budgets />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/goals"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Goals />
                 </MainLayout>
               </ProtectedRoute>
             }

@@ -138,13 +138,17 @@ public class TransactionController(TransactionRepository repository, CategoryRep
 
     // 2. GET (Extrato)
     [HttpGet]
-    public IActionResult GetStatement([FromQuery] DateTime? start, [FromQuery] DateTime? end)
+    public IActionResult GetStatement(
+        [FromQuery] DateTime? start,
+        [FromQuery] DateTime? end,
+        [FromQuery] Guid? categoryId,
+        [FromQuery] Guid? accountId)
     {
         var userId = GetCurrentUserId();
         var startDate = start ?? new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
         var endDate = end ?? startDate.AddMonths(1).AddDays(-1);
 
-        var transactions = _repository.GetStatement(startDate, endDate, userId);
+        var transactions = _repository.GetStatement(startDate, endDate, userId, categoryId, accountId);
 
         var response = transactions.Select(t => new
         {

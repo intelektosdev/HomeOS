@@ -9,7 +9,7 @@ export function Debts() {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [viewMode, setViewMode] = useState<ViewMode>('cards');
-    const [selectedDebt, setSelectedDebt] = useState<string | null>(null);
+
     const [amortizationSchedule, setAmortizationSchedule] = useState<DebtInstallment[]>([]);
     const [showSchedule, setShowSchedule] = useState(false);
     const [statistics, setStatistics] = useState({ totalDebt: 0, activeDebtCount: 0 });
@@ -84,7 +84,7 @@ export function Debts() {
         try {
             const schedule = await DebtsService.getAmortizationSchedule(debtId);
             setAmortizationSchedule(schedule);
-            setSelectedDebt(debtId);
+
             setShowSchedule(true);
         } catch (error) {
             console.error('Erro ao carregar tabela de amortização', error);

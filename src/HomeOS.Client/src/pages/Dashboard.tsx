@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { AnalyticsService } from '../services/api';
-import type { AnalyticsSummaryResponse, GroupedDataResponse } from '../types';
+import { AnalyticsService, DebtsService, InvestmentsService } from '../services/api';
+import type { AnalyticsSummaryResponse, GroupedDataResponse, DebtStatistics, PortfolioSummary } from '../types';
 import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
 type PeriodFilter = 'today' | 'week' | 'month' | 'year' | 'custom';
@@ -8,6 +8,8 @@ type GroupBy = 'category' | 'account' | 'status';
 
 export function Dashboard() {
     const [summary, setSummary] = useState<AnalyticsSummaryResponse | null>(null);
+    const [debtStats, setDebtStats] = useState<DebtStatistics | null>(null);
+    const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('month');
     const [groupBy, setGroupBy] = useState<GroupBy>('category');
@@ -53,8 +55,15 @@ export function Dashboard() {
             const { start, end } = getPeriodDates(periodFilter);
             if (!start || !end) return; // Skip if custom dates not set
 
-            const data = await AnalyticsService.getSummary(start, end, groupBy);
-            setSummary(data);
+            const [summaryData, debtData, portfolioData] = await Promise.all([
+                AnalyticsService.getSummary(start, end, groupBy),
+                DebtsService.getStatistics(),
+                InvestmentsService.getPortfolio()
+            ]);
+
+            setSummary(summaryData);
+            setDebtStats(debtData);
+            setPortfolio(portfolioData);
         } catch (error) {
             console.error('Failed to load analytics', error);
         } finally {
@@ -238,6 +247,96 @@ export function Dashboard() {
                                 />
                             </PieChart>
                         </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
+
+            {/* Wealth & Debt Section */}
+            {(debtStats || portfolio) && (
+                <div style={{ marginBottom: '2rem' }}>
+                    <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', marginTop: '2rem' }}>Patrimônio e Dívidas</h2>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
+
+                        {/* Investments Card */}
+                        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                                <div>
+                                    <h3 style={{ marginBottom: '0.5rem' }}>Investimentos</h3>
+                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Total Investido</p>
+                                    <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: 'var(--income-color)' }}>
+                                        {portfolio?.summary?.CurrentValue?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || 'R$ 0,00'}
+                                    </div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Retorno</p>
+                                    <div style={{
+                                        color: (portfolio?.summary?.TotalReturn || 0) >= 0 ? 'var(--income-color)' : 'var(--expense-color)',
+                                        fontWeight: '600'
+                                    }}>
+                                        {(portfolio?.summary?.TotalReturn || 0) > 0 ? '+' : ''}
+                                        {portfolio?.summary?.TotalReturn?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || 'R$ 0,00'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {portfolio?.byType && portfolio.byType.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={200}>
+                                    <PieChart>
+                                        <Pie
+                                            data={portfolio.byType}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={60}
+                                            outerRadius={80}
+                                            paddingAngle={5}
+                                            dataKey="CurrentValue"
+                                        >
+                                            {portfolio.byType.map((_, index) => (
+                                                <Cell key={`cell-${index}`} fill={['#6366f1', '#ec4899', '#10b981', '#f59e0b'][index % 4]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip
+                                            formatter={(value: any) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            contentStyle={{ background: 'rgba(17, 24, 39, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                                        />
+                                        <Legend />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="empty-state" style={{ padding: '2rem 0' }}>Sem investimentos registrados</div>
+                            )}
+                        </div>
+
+                        {/* Debts Card */}
+                        <div className="glass-panel" style={{ padding: '1.5rem', position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ position: 'relative', zIndex: 1 }}>
+                                <h3 style={{ marginBottom: '1.5rem' }}>Dívidas Ativas</h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                    <div>
+                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Total Devedor</p>
+                                        <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--expense-color)' }}>
+                                            {debtStats?.totalDebt.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || 'R$ 0,00'}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Contratos Ativos</p>
+                                        <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                                            {debtStats?.activeDebtCount || 0}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ marginTop: '2rem' }}>
+                                    <div className="progress-bar-container" style={{ height: '0.5rem', background: 'rgba(239, 68, 68, 0.2)' }}>
+                                        {/* Just a visual bar for now, since we don't have limit vs debt readily available here without more calls */}
+                                        <div className="progress-bar" style={{ width: '100%', background: 'var(--expense-color)' }}></div>
+                                    </div>
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
+                                        Mantenha suas dívidas sob controle
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             )}

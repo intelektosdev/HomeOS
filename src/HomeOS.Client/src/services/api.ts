@@ -396,3 +396,272 @@ export const RecurringTransactionsService = {
 };
 
 
+// ===== DEBT SERVICES =====
+
+export interface Debt {
+    id: string;
+    userId: string;
+    name: string;
+    category: string;
+    creditor: string;
+    originalAmount: number;
+    currentBalance: number;
+    interestType: string;
+    amortizationType: string;
+    startDate: string;
+    totalInstallments: number;
+    installmentsPaid: number;
+    status: string;
+    linkedAccountId?: string;
+    notes?: string;
+}
+
+export interface DebtInstallment {
+    id: string;
+    debtId: string;
+    installmentNumber: number;
+    dueDate: string;
+    paidDate?: string;
+    totalAmount: number;
+    principalAmount: number;
+    interestAmount: number;
+    remainingBalance: number;
+    transactionId?: string;
+}
+
+export interface CreateDebtRequest {
+    userId: string;
+    name: string;
+    category: string;
+    creditor: string;
+    amount: number;
+    interestIsFixed: boolean;
+    monthlyRate: number;
+    interestIndexer?: string;
+    amortizationType: string;
+    totalInstallments: number;
+    startDate: string;
+    generateSchedule?: boolean;
+}
+
+export interface UpdateDebtRequest {
+    userId: string;
+    name: string;
+    creditor: string;
+    linkedAccountId?: string;
+    notes?: string;
+}
+
+export interface PayInstallmentRequest {
+    userId: string;
+    installmentNumber: number;
+    paymentDate: string;
+    amountPaid: number;
+    transactionId?: string;
+}
+
+export interface DebtStatistics {
+    totalDebt: number;
+    activeDebtCount: number;
+}
+
+export const DebtsService = {
+    getAll: async (onlyActive = false) => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        const response = await api.get<Debt[]>('/debts', {
+            params: { userId, onlyActive }
+        });
+        return response.data;
+    },
+    getById: async (id: string) => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        const response = await api.get<Debt>(`/debts/${id}`, {
+            params: { userId }
+        });
+        return response.data;
+    },
+    create: async (data: CreateDebtRequest) => {
+        const response = await api.post<Debt>('/debts', data);
+        return response.data;
+    },
+    update: async (id: string, data: UpdateDebtRequest) => {
+        const response = await api.put<Debt>(`/debts/${id}`, data);
+        return response.data;
+    },
+    delete: async (id: string) => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        await api.delete(`/debts/${id}`, {
+            params: { userId }
+        });
+    },
+    getAmortizationSchedule: async (id: string) => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        const response = await api.get<DebtInstallment[]>(`/debts/${id}/amortization-schedule`, {
+            params: { userId }
+        });
+        return response.data;
+    },
+    payInstallment: async (id: string, data: PayInstallmentRequest) => {
+        const response = await api.post<Debt>(`/debts/${id}/pay-installment`, data);
+        return response.data;
+    },
+    getStatistics: async () => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        const response = await api.get<DebtStatistics>('/debts/statistics', {
+            params: { userId }
+        });
+        return response.data;
+    }
+};
+
+// ===== INVESTMENT SERVICES =====
+
+export interface Investment {
+    id: string;
+    userId: string;
+    name: string;
+    type: string;
+    initialAmount: number;
+    currentQuantity: number;
+    averagePrice: number;
+    currentPrice: number;
+    investmentDate: string;
+    maturityDate?: string;
+    annualYield?: number;
+    status: string;
+    linkedAccountId?: string;
+    notes?: string;
+}
+
+export interface InvestmentTransaction {
+    id: string;
+    investmentId: string;
+    type: string;
+    date: string;
+    quantity: number;
+    unitPrice: number;
+    totalAmount: number;
+    fees: number;
+    financialTransactionId?: string;
+}
+
+export interface CreateInvestmentRequest {
+    userId: string;
+    name: string;
+    type: string;
+    ticker?: string;
+    fixedIncomeSubType?: string;
+    bank?: string;
+    title?: string;
+    property?: string;
+    symbol?: string;
+    description?: string;
+    initialAmount: number;
+    quantity: number;
+    unitPrice: number;
+    investmentDate: string;
+    maturityDate?: string;
+    annualYield?: number;
+}
+
+export interface UpdateInvestmentRequest {
+    userId: string;
+    name: string;
+    currentPrice: number;
+    annualYield?: number;
+    linkedAccountId?: string;
+    notes?: string;
+}
+
+export interface BuySellRequest {
+    userId: string;
+    quantity: number;
+    unitPrice: number;
+    date: string;
+    fees?: number;
+}
+
+export interface InvestmentPerformance {
+    currentValue: number;
+    totalReturn: number;
+    returnPercentage: number;
+    annualizedReturn: number;
+    daysInvested: number;
+}
+
+export interface PortfolioSummary {
+    summary: {
+        totalInvestments: number;
+        totalInvested: number;
+        currentValue: number;
+        totalReturn: number;
+    };
+    byType: Array<{
+        investmentType: string;
+        count: number;
+        totalInvested: number;
+        currentValue: number;
+        totalReturn: number;
+    }>;
+}
+
+export const InvestmentsService = {
+    getAll: async (onlyActive = false) => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        const response = await api.get<Investment[]>('/investments', {
+            params: { userId, onlyActive }
+        });
+        return response.data;
+    },
+    getById: async (id: string) => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        const response = await api.get<Investment>(`/investments/${id}`, {
+            params: { userId }
+        });
+        return response.data;
+    },
+    create: async (data: CreateInvestmentRequest) => {
+        const response = await api.post<Investment>('/investments', data);
+        return response.data;
+    },
+    update: async (id: string, data: UpdateInvestmentRequest) => {
+        const response = await api.put<Investment>(`/investments/${id}`, data);
+        return response.data;
+    },
+    delete: async (id: string) => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        await api.delete(`/investments/${id}`, {
+            params: { userId }
+        });
+    },
+    buy: async (id: string, data: BuySellRequest) => {
+        const response = await api.post<Investment>(`/investments/${id}/buy`, data);
+        return response.data;
+    },
+    sell: async (id: string, data: BuySellRequest) => {
+        const response = await api.post<Investment>(`/investments/${id}/sell`, data);
+        return response.data;
+    },
+    getTransactions: async (id: string) => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        const response = await api.get<InvestmentTransaction[]>(`/investments/${id}/transactions`, {
+            params: { userId }
+        });
+        return response.data;
+    },
+    getPerformance: async (id: string) => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        const response = await api.get<InvestmentPerformance>(`/investments/${id}/performance`, {
+            params: { userId }
+        });
+        return response.data;
+    },
+    getPortfolio: async () => {
+        const userId = localStorage.getItem('userId') || '22f4bd46-313d-424a-83b9-0c367ad46c3b';
+        const response = await api.get<PortfolioSummary>('/investments/portfolio', {
+            params: { userId }
+        });
+        return response.data;
+    }
+};
+

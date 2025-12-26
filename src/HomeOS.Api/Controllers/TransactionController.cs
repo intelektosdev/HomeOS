@@ -276,7 +276,7 @@ public class TransactionController(TransactionRepository repository, CategoryRep
             t.Id,
             t.Description,
             t.Amount,
-            t.Status.ToString(),
+            GetStatusString(t.Status),
             t.DueDate,
             t.CategoryId,
             t.Source.IsFromAccount ? ((TransactionSource.FromAccount)t.Source).accountId : (Guid?)null,
@@ -287,5 +287,17 @@ public class TransactionController(TransactionRepository repository, CategoryRep
             Microsoft.FSharp.Core.FSharpOption<int>.get_IsSome(t.InstallmentNumber) ? t.InstallmentNumber.Value : (int?)null,
             Microsoft.FSharp.Core.FSharpOption<int>.get_IsSome(t.TotalInstallments) ? t.TotalInstallments.Value : (int?)null
         );
+    }
+
+    private string GetStatusString(TransactionStatus status)
+    {
+        return status.Tag switch
+        {
+            0 => "Pending",
+            1 => "Paid",
+            2 => "Conciliated",
+            3 => "Cancelled",
+            _ => "Pending"
+        };
     }
 }

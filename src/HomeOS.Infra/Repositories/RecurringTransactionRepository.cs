@@ -54,7 +54,7 @@ public class RecurringTransactionRepository(IConfiguration configuration)
         connection.Execute(sql, dbModel);
     }
 
-    public RecurringTransaction? GetById(Guid id, Guid userId)
+    public virtual RecurringTransaction? GetById(Guid id, Guid userId)
     {
         const string sql = @"
             SELECT *
@@ -87,7 +87,7 @@ public class RecurringTransactionRepository(IConfiguration configuration)
         return dbModels.Select(RecurringTransactionMapper.ToDomain);
     }
 
-    public IEnumerable<RecurringTransaction> GetDueForGeneration(Guid userId, DateTime upToDate)
+    public virtual IEnumerable<RecurringTransaction> GetDueForGeneration(Guid userId, DateTime upToDate)
     {
         const string sql = @"
             SELECT *
@@ -104,7 +104,7 @@ public class RecurringTransactionRepository(IConfiguration configuration)
         return dbModels.Select(RecurringTransactionMapper.ToDomain);
     }
 
-    public void UpdateNextOccurrence(Guid id, DateTime nextDate, Guid userId)
+    public virtual void UpdateNextOccurrence(Guid id, DateTime nextDate, Guid userId)
     {
         const string sql = @"
             UPDATE [Finance].[RecurringTransactions]
@@ -116,7 +116,7 @@ public class RecurringTransactionRepository(IConfiguration configuration)
         connection.Execute(sql, new { Id = id, NextDate = nextDate, UserId = userId });
     }
 
-    public void LinkGeneratedTransaction(Guid transactionId, Guid recurringId)
+    public virtual void LinkGeneratedTransaction(Guid transactionId, Guid recurringId)
     {
         const string sql = @"
             INSERT INTO [Finance].[GeneratedTransactions] 

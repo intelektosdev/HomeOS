@@ -10,6 +10,8 @@
     <Compile Include="FinancialTypes.fs" />
     <Compile Include="RecurringTransactionTypes.fs" />
     <Compile Include="InventoryTypes.fs" />
+    <Compile Include="DebtTypes.fs" />
+    <Compile Include="InvestmentTypes.fs" />
   </ItemGroup>
 
 </Project>

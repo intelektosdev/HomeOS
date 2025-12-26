@@ -84,6 +84,16 @@ export function Sidebar() {
                         <span className="nav-icon">🔄</span>
                         <span className="nav-label">Recorrências</span>
                     </NavLink>
+
+                    <NavLink to="/debts" className="nav-item">
+                        <span className="nav-icon">💳</span>
+                        <span className="nav-label">Dívidas</span>
+                    </NavLink>
+
+                    <NavLink to="/investments" className="nav-item">
+                        <span className="nav-icon">📈</span>
+                        <span className="nav-label">Investimentos</span>
+                    </NavLink>
                 </div>
 
                 <div className="nav-section">

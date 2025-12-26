@@ -158,5 +158,41 @@ Sistema completo para automação de lançamentos periódicos (receitas e despes
     - ✅ **Detecção de Anomalias**: Valores variáveis fora do padrão ficam evidentes.
 
 ---
-*Documentação atualizada em 2025-12-24*
+---
+### I. Gestão de Dívidas (Novo)
+Módulo especializado para controle de passivos financeiros e planejamento de amortização.
+
+- **Domínio (F#)**:
+    - `Debt`: Entidade principal contendo credor, montante original, saldo atual e prazos.
+    - `DebtInstallment`: Detalhamento de cada parcela com decomposição entre Principal e Juros.
+- **Configurações Flexíveis**:
+    - **Categorias**: Financiamento Imobiliário, Empréstimo Pessoal, Financiamento de Veículo, Estudantil e Outros.
+    - **Sistemas de Amortização**: **Price** (parcelas fixas), **SAC** (amortização constante), **Bullet** (pagamento único ao final) e Customizado.
+    - **Tipos de Juros**: Suporte a Taxa Fixa ou Variável (Indexadores como CDI, IPCA, etc).
+- **Funcionalidades**:
+    - **Geração de Tabela de Amortização**: Cálculo automático de todas as parcelas futuras baseado no sistema escolhido (Price/SAC/Bullet).
+    - **Pagamento de Parcelas**: Registro de pagamentos com atualização automática do saldo devedor e contagem de parcelas.
+    - **Ciclo de Vida**: Estados para dívidas Ativas, Quitadas, Refinanciadas ou Inadimplentes.
+    - **Custo Efetivo**: Cálculo do custo total da dívida (Principal + Juros Acumulados).
+
+---
+### J. Gestão de Investimentos (Novo)
+Módulo completo para acompanhamento de patrimônio, gestão de ativos e análise de rentabilidade.
+
+- **Domínio (F#)**:
+    - `Investment`: Registro consolidado do ativo (Preço Médio, Quantidade, Valor Atual).
+    - `InvestmentTransaction`: Histórico de movimentações (Compra, Venda, Dividendos, Juros).
+- **Tipos de Ativos Suportados**:
+    - **Renda Variável**: Ações (Ticker) e Criptomoedas (Símbolo).
+    - **Renda Fixa**: CDB, LCI, LCA, Tesouro Direto e Debêntures.
+    - **Outros**: Imóveis e ativos genéricos.
+- **Inteligência de Carteira**:
+    - **Gestão de Posição**: Cálculo automático de **Preço Médio** em compras/vendas sucessivas.
+    - **Rentabilidade Real-Time**: Acompanhamento de lucro/prejuízo (valor absoluto e percentual) baseado no preço de mercado atualizado.
+    - **Performance Anualizada**: Cálculo de taxa de retorno anualizada (Annualized Return) baseada no tempo de permanência no ativo.
+    - **Projeções**: Estimativa de valor futuro para ativos de renda fixa baseada no Yield anual.
+    - **Rendimentos Passivos**: Registro e histórico dedicado para Dividendos e Juros sobre Capital Próprio.
+
+---
+*Documentação atualizada em 2025-12-26*
 

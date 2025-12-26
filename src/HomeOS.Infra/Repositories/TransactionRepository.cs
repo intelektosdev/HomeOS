@@ -14,7 +14,7 @@ public class TransactionRepository(IConfiguration configuration)
     private readonly string _connectionString = configuration.GetConnectionString("DefaultConnection")
                             ?? throw new Exception("ConnectionString não encontrada");
 
-    public void Save(Transaction transaction, Guid userId)
+    public virtual void Save(Transaction transaction, Guid userId)
     {
         var dbModel = TransactionMapper.ToDb(transaction);
         dbModel.UserId = userId;

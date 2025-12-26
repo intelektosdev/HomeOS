@@ -3,6 +3,7 @@ using HomeOS.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +23,10 @@ builder.Services.AddScoped<PurchaseItemRepository>();
 builder.Services.AddScoped<CreditCardPaymentRepository>();
 builder.Services.AddScoped<RecurringTransactionRepository>();
 
+// Debt and Investment Repositories
+builder.Services.AddScoped<DebtRepository>();
+builder.Services.AddScoped<InvestmentRepository>();
+
 // Register Services
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<HomeOS.Infra.Services.RecurringTransactionService>();
@@ -29,7 +34,14 @@ builder.Services.AddScoped<HomeOS.Infra.Services.RecurringTransactionService>();
 // Add HttpContextAccessor for getting current user in controllers
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // System.Text.Json com suporte a F#
+        options.JsonSerializerOptions.Converters.Add(new JsonFSharpConverter(
+            unionEncoding: JsonUnionEncoding.UnwrapFieldlessTags |
+                           JsonUnionEncoding.UnwrapOption));
+    });
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

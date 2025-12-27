@@ -216,4 +216,17 @@ export interface PortfolioSummary {
         TotalReturn: number;
     }>;
 }
+// --- CASH FLOW ---
 
+export interface CashFlowDataPoint {
+    date: string;
+    balance: number;
+    incoming: number;
+    outgoing: number;
+    description: string;
+}
+
+export interface CashFlowForecastResponse {
+    startingBalance: number;
+    dataPoints: CashFlowDataPoint[];
+}

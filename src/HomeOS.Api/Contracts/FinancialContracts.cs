@@ -96,6 +96,17 @@ public record GroupedDataResponse(
     decimal Income,
     decimal Expense,
     int Count
+);// --- CASH FLOW ---
+
+public record CashFlowForecastResponse(
+    decimal StartingBalance,
+    List<CashFlowDataPoint> DataPoints
 );
 
-
+public record CashFlowDataPoint(
+    DateTime Date,
+    decimal Balance,
+    decimal Incoming,
+    decimal Outgoing,
+    string Description
+);

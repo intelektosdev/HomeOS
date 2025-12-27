@@ -15,6 +15,7 @@ import { Suppliers } from './pages/Suppliers';
 import { RecurringTransactions } from './pages/RecurringTransactions';
 import { Debts } from './pages/Debts';
 import { Investments } from './pages/Investments';
+import { CashFlowForecast } from './pages/CashFlowForecast';
 import { Budgets } from './pages/Budgets';
 import { Goals } from './pages/Goals';
 
@@ -147,6 +148,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <RecurringTransactions />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics/cash-flow"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <CashFlowForecast />
                 </MainLayout>
               </ProtectedRoute>
             }

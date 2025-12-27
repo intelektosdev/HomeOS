@@ -70,7 +70,7 @@ public class TransactionRepository(IConfiguration configuration)
     {
         var sql = @"
         SELECT 
-            Id, Description, Amount, DueDate, CategoryId, AccountId, CreditCardId, BillPaymentId,
+            Id, Description, Amount, Type, DueDate, CategoryId, AccountId, CreditCardId, BillPaymentId,
             CASE 
                 WHEN StatusId = 1 THEN 'Pending'
                 WHEN StatusId = 2 THEN 'Paid'

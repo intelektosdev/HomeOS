@@ -17,7 +17,9 @@ import type {
     PayBillRequest,
     PayBillResponse,
     DebtStatistics,
-    PortfolioSummary
+    PortfolioSummary,
+    CashFlowForecastResponse,
+    AnalyticsSummaryResponse
 } from '../types';
 
 export const api = axios.create({
@@ -353,8 +355,17 @@ export const PurchasesService = {
 
 export const AnalyticsService = {
     getSummary: async (startDate: string, endDate: string, groupBy: string = 'category') => {
-        const response = await api.get<import('../types').AnalyticsSummaryResponse>('/analytics/summary', {
+        const response = await api.get<AnalyticsSummaryResponse>('/analytics/summary', {
             params: { startDate, endDate, groupBy }
+        });
+        return response.data;
+    }
+};
+
+export const CashFlowService = {
+    getForecast: async (months: number = 6) => {
+        const response = await api.get<CashFlowForecastResponse>('/cash-flow/forecast', {
+            params: { months }
         });
         return response.data;
     }

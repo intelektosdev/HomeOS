@@ -141,6 +141,11 @@ export function Sidebar() {
                                 <span className="nav-label">Recorrências</span>
                             </NavLinkMobile>
 
+                            <NavLinkMobile to="/analytics/cash-flow" className="nav-item">
+                                <span className="nav-icon">🗓️</span>
+                                <span className="nav-label">Fluxo de Caixa</span>
+                            </NavLinkMobile>
+
                             <NavLinkMobile to="/debts" className="nav-item">
                                 <span className="nav-icon">💳</span>
                                 <span className="nav-label">Dívidas</span>

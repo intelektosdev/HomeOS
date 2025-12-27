@@ -205,5 +205,25 @@ Módulo completo para acompanhamento de patrimônio, gestão de ativos e anális
         - Vínculo bidirecional entre a operação de investimento e o lançamento no extrato bancário.
 
 ---
-*Documentação atualizada em 2025-12-26 21:00*
+---
+### K. Fluxo de Caixa Provisório (Novo)
+Módulo vital de inteligência financeira que projeta a liquidez futura e saúde financeira, permitindo antecipar cenários de insolvência ou excesso de caixa.
+
+- **Algoritmo de Projeção**:
+    - Combina **Saldo Atual** (todas as contas ativas).
+    - (+) **Entradas Futuras**: Transações de Receita pendentes e Recorrências de Receita projetadas.
+    - (-) **Saídas Futuras**: Transações de Despesa pendentes e Recorrências de Despesa projetadas.
+    - **Projeção Diária**: Simulação granular dia-a-dia para identificar exatamente quando o saldo ficará crítico.
+
+- **Funcionalidades**:
+    - **Gráfico Interativo**: Visualização da curva de saldo ao longo do tempo (3, 6 ou 12 meses) usando Recharts.
+    - **Linha de Segurança**: Identificação visual clara do nível zero (ou cheque especial).
+    - **Indicadores Chave**:
+        - **Ponto de Mínimo**: Data e valor do pior cenário financeiro no período.
+        - **Patrimônio Estimado**: Saldo final ao término da projeção.
+        - **Maiores Movimentações**: Ranking das principais entradas e saídas previstas para o período.
+    - **Resiliência a Falhas**: Tratamento robusto de `serialization` (camelCase vs PascalCase) para garantir compatibilidade entre Backend (.NET) e Frontend (React).
+
+---
+*Documentação atualizada em 2025-12-26 21:40*
 

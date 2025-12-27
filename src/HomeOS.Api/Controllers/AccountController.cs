@@ -9,20 +9,28 @@ namespace HomeOS.Api.Controllers;
 
 [ApiController]
 [Route("api/accounts")]
-[Authorize]
+// [Authorize] // Disabled for local development
 public class AccountController(AccountRepository repository) : ControllerBase
 {
     private readonly AccountRepository _repository = repository;
 
+    // Fixed userId for local development without authentication
+    private static readonly Guid FixedUserId = Guid.Parse("22f4bd46-313d-424a-83b9-0c367ad46c3b");
+
     private Guid GetCurrentUserId()
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdClaim == null || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            throw new UnauthorizedAccessException("User ID not found in token");
-        }
-        return userId;
+        // For local development, return fixed userId
+        return FixedUserId;
+
+        // Original JWT-based authentication:
+        // var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        // if (userIdClaim == null || !Guid.TryParse(userIdClaim, out var userId))
+        // {
+        //     throw new UnauthorizedAccessException("User ID not found in token");
+        // }
+        // return userId;
     }
+
 
     [HttpPost]
     public IActionResult Create([FromBody] CreateAccountRequest request)

@@ -1,0 +1,31 @@
+# Multi-stage build for .NET API
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+# Copy project files first for layer caching
+COPY src/HomeOS.Domain/HomeOS.Domain.fsproj ./HomeOS.Domain/
+COPY src/HomeOS.Infra/HomeOS.Infra.csproj ./HomeOS.Infra/
+COPY src/HomeOS.Api/HomeOS.Api.csproj ./HomeOS.Api/
+
+# Restore dependencies
+RUN dotnet restore HomeOS.Api/HomeOS.Api.csproj
+
+# Copy source code
+COPY src/HomeOS.Domain/ ./HomeOS.Domain/
+COPY src/HomeOS.Infra/ ./HomeOS.Infra/
+COPY src/HomeOS.Api/ ./HomeOS.Api/
+
+# Build and publish
+WORKDIR /src/HomeOS.Api
+RUN dotnet publish -c Release -o /app/publish
+
+# Runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+
+# Configure Kestrel to listen on all interfaces
+ENV ASPNETCORE_URLS=http://+:5050
+EXPOSE 5050
+
+ENTRYPOINT ["dotnet", "HomeOS.Api.dll"]

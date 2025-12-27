@@ -42,6 +42,16 @@ export function Transactions() {
     };
 
     const handleCancel = async (transaction: TransactionResponse) => {
+        // Verificar se a transação já está conciliada ou cancelada
+        if (transaction.status === 'Conciliated') {
+            alert('Não é possível cancelar uma transação já conciliada.');
+            return;
+        }
+        if (transaction.status === 'Cancelled') {
+            alert('Esta transação já foi cancelada.');
+            return;
+        }
+
         const reason = prompt(`Digite o motivo do cancelamento para "${transaction.description}":`);
         if (reason === null) return; // User pressed Cancel
         if (!reason.trim()) {
@@ -52,9 +62,15 @@ export function Transactions() {
         try {
             await TransactionsService.cancel(transaction.id, reason);
             setRefreshTrigger(prev => prev + 1);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Erro ao cancelar transação', error);
-            alert('Erro ao cancelar transação');
+            // Tratamento de erros específicos do domínio
+            const errorMessage = error.response?.data?.error || '';
+            if (errorMessage.includes('TransactionIsCancelled')) {
+                alert('Não é possível cancelar esta transação. Ela pode já estar cancelada ou conciliada.');
+            } else {
+                alert('Erro ao cancelar transação. Tente novamente.');
+            }
         }
     };
 
@@ -186,6 +202,7 @@ export function Transactions() {
                 onConciliate={handleConciliate}
                 onPay={handlePay}
                 refreshTrigger={refreshTrigger}
+                categories={categories}
                 filters={{
                     month,
                     year,

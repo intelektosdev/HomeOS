@@ -9,21 +9,20 @@ namespace HomeOS.Api.Controllers;
 
 [ApiController]
 [Route("api/transactions")]
-[Authorize]
+// [Authorize] // Disabled for local development
 public class TransactionController(TransactionRepository repository, CategoryRepository categoryRepository) : ControllerBase
 {
     private readonly TransactionRepository _repository = repository;
     private readonly CategoryRepository _categoryRepository = categoryRepository;
 
+    // Fixed userId for local development without authentication
+    private static readonly Guid FixedUserId = Guid.Parse("22f4bd46-313d-424a-83b9-0c367ad46c3b");
+
     private Guid GetCurrentUserId()
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdClaim == null || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            throw new UnauthorizedAccessException("User ID not found in token");
-        }
-        return userId;
+        return FixedUserId;
     }
+
 
     // 1. POST: Create Expense (supports installments via Credit Card)
     [HttpPost]

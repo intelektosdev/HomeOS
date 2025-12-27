@@ -20,24 +20,23 @@ interface AuthProviderProps {
     children: ReactNode;
 }
 
+// Fixed user for local development without authentication
+const FIXED_USER: User = {
+    id: '22f4bd46-313d-424a-83b9-0c367ad46c3b',
+    email: 'local@homeos.dev',
+    name: 'Local User'
+};
+
 export function AuthProvider({ children }: AuthProviderProps) {
-    const [user, setUser] = useState<User | null>(null);
-    const [token, setToken] = useState<string | null>(null);
+    // For local development, start with fixed user already logged in
+    const [user, setUser] = useState<User | null>(FIXED_USER);
+    const [token, setToken] = useState<string | null>('local-dev-token');
 
     useEffect(() => {
-        // Load token and user from localStorage on mount
-        const storedToken = localStorage.getItem('token');
-        const storedUser = localStorage.getItem('user');
-
-        if (storedToken && storedUser) {
-            setToken(storedToken);
-            const parsedUser = JSON.parse(storedUser);
-            setUser(parsedUser);
-            // Ensure userId is also stored separately (migration support)
-            if (!localStorage.getItem('userId') && parsedUser.id) {
-                localStorage.setItem('userId', parsedUser.id);
-            }
-        }
+        // Set fixed userId in localStorage for components that use it directly
+        localStorage.setItem('userId', FIXED_USER.id);
+        localStorage.setItem('user', JSON.stringify(FIXED_USER));
+        localStorage.setItem('token', 'local-dev-token');
     }, []);
 
     const login = (newToken: string, newUser: User) => {
@@ -49,14 +48,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     const logout = () => {
-        setToken(null);
-        setUser(null);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('userId');
+        // For local dev, don't really logout - just reset to fixed user
+        setToken('local-dev-token');
+        setUser(FIXED_USER);
+        localStorage.setItem('token', 'local-dev-token');
+        localStorage.setItem('user', JSON.stringify(FIXED_USER));
+        localStorage.setItem('userId', FIXED_USER.id);
     };
 
-    const isAuthenticated = !!token && !!user;
+    // Always authenticated in local development
+    const isAuthenticated = true;
 
     return (
         <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated }}>

@@ -8,7 +8,7 @@ namespace HomeOS.Api.Controllers;
 
 [ApiController]
 [Route("api/shopping-list")]
-[Authorize]
+// [Authorize] // Disabled for local development
 public class ShoppingListController : ControllerBase
 {
     private readonly ShoppingListRepository _shoppingListRepository;
@@ -28,11 +28,14 @@ public class ShoppingListController : ControllerBase
         _purchaseItemRepository = purchaseItemRepository;
     }
 
+    // Fixed userId for local development without authentication
+    private static readonly Guid FixedUserId = Guid.Parse("22f4bd46-313d-424a-83b9-0c367ad46c3b");
+
     private Guid GetCurrentUserId()
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        return Guid.Parse(userIdClaim!);
+        return FixedUserId;
     }
+
 
     // GET: api/shopping-list
     [HttpGet]

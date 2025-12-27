@@ -117,3 +117,9 @@ ipch/
 
 # Rider
 .idea/
+
+# Local Env
+.env
+
+# Docker volumes
+sqldata/

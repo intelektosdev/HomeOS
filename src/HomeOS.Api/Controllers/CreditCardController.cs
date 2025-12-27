@@ -9,7 +9,7 @@ namespace HomeOS.Api.Controllers;
 
 [ApiController]
 [Route("api/credit-cards")]
-[Authorize]
+// [Authorize] // Disabled for local development
 public class CreditCardController(
     CreditCardRepository repository,
     TransactionRepository transactionRepository,
@@ -19,15 +19,14 @@ public class CreditCardController(
     private readonly TransactionRepository _transactionRepository = transactionRepository;
     private readonly CreditCardPaymentRepository _paymentRepository = paymentRepository;
 
+    // Fixed userId for local development without authentication
+    private static readonly Guid FixedUserId = Guid.Parse("22f4bd46-313d-424a-83b9-0c367ad46c3b");
+
     private Guid GetCurrentUserId()
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdClaim == null || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            throw new UnauthorizedAccessException("User ID not found in token");
-        }
-        return userId;
+        return FixedUserId;
     }
+
 
     [HttpPost]
     public IActionResult Create([FromBody] CreateCreditCardRequest request)

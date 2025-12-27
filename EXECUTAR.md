@@ -204,6 +204,63 @@ npm run dev -- --force
 
 ---
 
+## 🐳 Execução com Docker (Produção)
+
+### Pré-requisitos
+- Docker Desktop instalado
+
+### 1. Configurar IP da Rede
+Edite o arquivo `.env` e substitua `localhost` pelo IP da sua máquina:
+
+```bash
+# Descubra seu IP
+ipconfig
+
+# Edite o .env
+API_URL=http://192.168.X.X:5050
+```
+
+### 2. Subir os Containers
+
+```bash
+cd c:\projetos\finance_dev\HomeOS
+
+# Primeira vez (build + start)
+docker-compose up -d --build
+
+# Ver logs
+docker-compose logs -f
+
+# Parar
+docker-compose down
+```
+
+### 3. Inicializar Banco de Dados
+Após os containers estarem rodando, execute os scripts SQL:
+
+```bash
+# Conectar ao container do SQL Server
+docker exec -it homeos-db /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "HomeOS@2024!" -C
+
+# Ou use Azure Data Studio / SSMS conectando em localhost:1433
+```
+
+Execute os scripts da pasta `scripts/` na ordem:
+1. `estrutura.sql`
+2. `CreateUsersTable.sql` (se necessário atualizar Users)
+3. Demais schemas (Investments, Debts, etc.)
+4. `init-db.sql` (cria usuário e categorias padrão)
+
+### 4. Acessar o Sistema
+- **Frontend**: http://SEU_IP (porta 80)
+- **API**: http://SEU_IP:5050
+
+### Reinício Automático
+Com `restart: always`, os containers iniciam automaticamente quando o Windows ligar.
+
+---
+
 **Status**: ✅ Sistema 100% funcional e pronto para uso!
 **Build**: 0 erros, 0 avisos
-**Última atualização**: 25/12/2025
+**Última atualização**: 27/12/2025
+

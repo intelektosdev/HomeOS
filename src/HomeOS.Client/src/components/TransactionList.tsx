@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TransactionsService } from '../services/api';
-import type { TransactionResponse } from '../types';
+import type { TransactionResponse, CategoryResponse } from '../types';
 
 interface TransactionListProps {
     onEdit: (t: TransactionResponse) => void;
@@ -8,6 +8,7 @@ interface TransactionListProps {
     onConciliate: (t: TransactionResponse) => void;
     onPay: (t: TransactionResponse) => void;
     refreshTrigger: number;
+    categories: CategoryResponse[];
     filters: {
         month: number;
         year: number;
@@ -16,7 +17,9 @@ interface TransactionListProps {
     };
 }
 
-export function TransactionList({ onEdit, onCancel, onConciliate, onPay, refreshTrigger, filters }: TransactionListProps) {
+export function TransactionList({ onEdit, onCancel, onConciliate, onPay, refreshTrigger, categories, filters }: TransactionListProps) {
+    // Helper to get category info
+    const getCategoryById = (categoryId: string) => categories.find(c => c.id === categoryId);
     const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -59,7 +62,9 @@ export function TransactionList({ onEdit, onCancel, onConciliate, onPay, refresh
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                         <thead>
                             <tr style={{ borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
+                                <th style={{ padding: '1rem', width: '40px', textAlign: 'center' }}>Tipo</th>
                                 <th style={{ padding: '1rem' }}>Descrição</th>
+                                <th style={{ padding: '1rem' }}>Categoria</th>
                                 <th style={{ padding: '1rem' }}>Vencimento</th>
                                 <th style={{ padding: '1rem' }}>Valor</th>
                                 <th style={{ padding: '1rem' }}>Status</th>
@@ -67,82 +72,108 @@ export function TransactionList({ onEdit, onCancel, onConciliate, onPay, refresh
                             </tr>
                         </thead>
                         <tbody>
-                            {transactions.map(t => (
-                                <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', opacity: t.status === 'Cancelled' ? 0.5 : 1 }}>
-                                    <td style={{ padding: '1rem' }}>
-                                        <div style={{ fontWeight: 500 }}>{t.description}</div>
-                                        {t.status === 'Cancelled' && <small style={{ color: 'var(--color-danger)' }}>CANCELADA</small>}
-                                    </td>
-                                    <td style={{ padding: '1rem' }}>{new Date(t.dueDate).toLocaleDateString()}</td>
-                                    <td style={{ padding: '1rem', fontWeight: 'bold' }}>
-                                        R$ {(t.amount ?? 0).toFixed(2)}
-                                    </td>
-                                    <td style={{ padding: '1rem' }}>
-                                        <span style={{
-                                            padding: '0.25rem 0.75rem',
-                                            borderRadius: 'var(--radius-full)',
-                                            fontSize: '0.875rem',
-                                            background:
-                                                t.status === 'Paid' ? 'rgba(16, 185, 129, 0.2)' :
-                                                    t.status === 'Pending' ? 'rgba(245, 158, 11, 0.2)' :
-                                                        t.status === 'Conciliated' ? 'rgba(59, 130, 246, 0.2)' :
-                                                            t.status === 'Cancelled' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                                            color:
-                                                t.status === 'Paid' ? 'var(--color-success)' :
-                                                    t.status === 'Pending' ? 'var(--color-warning)' :
-                                                        t.status === 'Conciliated' ? '#60a5fa' :
-                                                            t.status === 'Cancelled' ? 'var(--color-danger)' : 'var(--color-text-primary)'
-                                        }}>
-                                            {t.status === 'Pending' ? 'Pendente' :
-                                                t.status === 'Paid' ? 'Pago' :
-                                                    t.status === 'Conciliated' ? 'Conciliado' :
-                                                        t.status === 'Cancelled' ? 'Cancelado' : t.status}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '1rem', textAlign: 'right' }}>
-                                        {t.status !== 'Cancelled' && (
-                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                                {t.status === 'Pending' && (
+                            {transactions.map(t => {
+                                const category = getCategoryById(t.categoryId);
+                                const isIncome = category?.type === 'Income';
+                                return (
+                                    <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', opacity: t.status === 'Cancelled' ? 0.5 : 1 }}>
+                                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                                            <span style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                width: '28px',
+                                                height: '28px',
+                                                borderRadius: '50%',
+                                                background: isIncome ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                                color: isIncome ? 'var(--color-success)' : 'var(--color-danger)',
+                                                fontSize: '1rem',
+                                                fontWeight: 'bold'
+                                            }}>
+                                                {isIncome ? '↑' : '↓'}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '1rem' }}>
+                                            <div style={{ fontWeight: 500 }}>{t.description}</div>
+                                            {t.status === 'Cancelled' && <small style={{ color: 'var(--color-danger)' }}>CANCELADA</small>}
+                                        </td>
+                                        <td style={{ padding: '1rem' }}>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                {category?.icon && <span>{category.icon}</span>}
+                                                <span style={{ color: 'var(--color-text-secondary)' }}>{category?.name || '-'}</span>
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '1rem' }}>{new Date(t.dueDate).toLocaleDateString()}</td>
+                                        <td style={{ padding: '1rem', fontWeight: 'bold' }}>
+                                            R$ {(t.amount ?? 0).toFixed(2)}
+                                        </td>
+                                        <td style={{ padding: '1rem' }}>
+                                            <span style={{
+                                                padding: '0.25rem 0.75rem',
+                                                borderRadius: 'var(--radius-full)',
+                                                fontSize: '0.875rem',
+                                                background:
+                                                    t.status === 'Paid' ? 'rgba(16, 185, 129, 0.2)' :
+                                                        t.status === 'Pending' ? 'rgba(245, 158, 11, 0.2)' :
+                                                            t.status === 'Conciliated' ? 'rgba(59, 130, 246, 0.2)' :
+                                                                t.status === 'Cancelled' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                                                color:
+                                                    t.status === 'Paid' ? 'var(--color-success)' :
+                                                        t.status === 'Pending' ? 'var(--color-warning)' :
+                                                            t.status === 'Conciliated' ? '#60a5fa' :
+                                                                t.status === 'Cancelled' ? 'var(--color-danger)' : 'var(--color-text-primary)'
+                                            }}>
+                                                {t.status === 'Pending' ? 'Pendente' :
+                                                    t.status === 'Paid' ? 'Pago' :
+                                                        t.status === 'Conciliated' ? 'Conciliado' :
+                                                            t.status === 'Cancelled' ? 'Cancelado' : t.status}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '1rem', textAlign: 'right' }}>
+                                            {t.status !== 'Cancelled' && (
+                                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                    {t.status === 'Pending' && (
+                                                        <button
+                                                            onClick={() => onPay(t)}
+                                                            className="btn-icon"
+                                                            title="Pagar"
+                                                            style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '0.5rem', borderRadius: '4px', border: 'none', cursor: 'pointer', color: 'var(--color-warning)' }}
+                                                        >
+                                                            💲
+                                                        </button>
+                                                    )}
+                                                    {t.status !== 'Conciliated' && (
+                                                        <button
+                                                            onClick={() => onConciliate(t)}
+                                                            className="btn-icon"
+                                                            title="Conciliar"
+                                                            style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '0.5rem', borderRadius: '4px', border: 'none', cursor: 'pointer', color: 'var(--color-success)' }}
+                                                        >
+                                                            ✅
+                                                        </button>
+                                                    )}
                                                     <button
-                                                        onClick={() => onPay(t)}
+                                                        onClick={() => onEdit(t)}
                                                         className="btn-icon"
-                                                        title="Pagar"
-                                                        style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '0.5rem', borderRadius: '4px', border: 'none', cursor: 'pointer', color: 'var(--color-warning)' }}
+                                                        title="Editar"
+                                                        style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '0.5rem', borderRadius: '4px', border: 'none', cursor: 'pointer', color: 'var(--color-text-primary)' }}
                                                     >
-                                                        💲
+                                                        ✏️
                                                     </button>
-                                                )}
-                                                {t.status !== 'Conciliated' && (
                                                     <button
-                                                        onClick={() => onConciliate(t)}
+                                                        onClick={() => onCancel(t)}
                                                         className="btn-icon"
-                                                        title="Conciliar"
-                                                        style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '0.5rem', borderRadius: '4px', border: 'none', cursor: 'pointer', color: 'var(--color-success)' }}
+                                                        title="Cancelar"
+                                                        style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '0.5rem', borderRadius: '4px', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }}
                                                     >
-                                                        ✅
+                                                        🚫
                                                     </button>
-                                                )}
-                                                <button
-                                                    onClick={() => onEdit(t)}
-                                                    className="btn-icon"
-                                                    title="Editar"
-                                                    style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '0.5rem', borderRadius: '4px', border: 'none', cursor: 'pointer', color: 'var(--color-text-primary)' }}
-                                                >
-                                                    ✏️
-                                                </button>
-                                                <button
-                                                    onClick={() => onCancel(t)}
-                                                    className="btn-icon"
-                                                    title="Cancelar"
-                                                    style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '0.5rem', borderRadius: '4px', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }}
-                                                >
-                                                    🚫
-                                                </button>
-                                            </div>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

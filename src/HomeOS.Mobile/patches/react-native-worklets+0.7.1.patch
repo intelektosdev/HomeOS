@@ -1,0 +1,13 @@
+diff --git a/node_modules/react-native-worklets/android/CMakeLists.txt b/node_modules/react-native-worklets/android/CMakeLists.txt
+index 7b0f0b4..e4b5b7a 100644
+--- a/node_modules/react-native-worklets/android/CMakeLists.txt
++++ b/node_modules/react-native-worklets/android/CMakeLists.txt
+@@ -66,7 +66,7 @@ if(ReactAndroid_VERSION_MINOR GREATER_EQUAL 80)
+   target_compile_reactnative_options(worklets PUBLIC)
+ else()
+   string(APPEND CMAKE_CXX_FLAGS
+-         " -fexceptions -frtti -std=c++${CMAKE_CXX_STANDARD} -Wall -Werror")
++         " -fexceptions -frtti -std=c++${CMAKE_CXX_STANDARD} -Wall")
+ endif()
+ 
+ # includes

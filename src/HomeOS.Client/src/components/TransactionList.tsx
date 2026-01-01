@@ -94,7 +94,14 @@ export function TransactionList({ onEdit, onCancel, onConciliate, onPay, refresh
                                             </span>
                                         </td>
                                         <td style={{ padding: '1rem' }}>
-                                            <div style={{ fontWeight: 500 }}>{t.description}</div>
+                                            <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                {t.description}
+                                                {t.installmentNumber && t.totalInstallments && (
+                                                    <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)', padding: '0.1rem 0.4rem', borderRadius: '4px', color: 'var(--color-text-muted)' }}>
+                                                        {t.installmentNumber}/{t.totalInstallments}
+                                                    </span>
+                                                )}
+                                            </div>
                                             {t.status === 'Cancelled' && <small style={{ color: 'var(--color-danger)' }}>CANCELADA</small>}
                                         </td>
                                         <td style={{ padding: '1rem' }}>
@@ -167,6 +174,24 @@ export function TransactionList({ onEdit, onCancel, onConciliate, onPay, refresh
                                                         style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '0.5rem', borderRadius: '4px', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }}
                                                     >
                                                         🚫
+                                                    </button>
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (confirm('Tem certeza que deseja EXCLUIR DEFINITIVAMENTE esta transação?')) {
+                                                                try {
+                                                                    await TransactionsService.delete(t.id);
+                                                                    // We don't have a direct trigger here, but we can call loadTransactions if we pass it or just refresh the page
+                                                                    window.location.reload(); // Simple way for now as loadTransactions is internal
+                                                                } catch (err) {
+                                                                    alert('Erro ao excluir transação.');
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="btn-icon"
+                                                        title="Excluir Definitivamente"
+                                                        style={{ background: 'rgba(239, 68, 68, 0.2)', padding: '0.5rem', borderRadius: '4px', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }}
+                                                    >
+                                                        🗑️
                                                     </button>
                                                 </div>
                                             )}

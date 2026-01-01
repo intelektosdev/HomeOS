@@ -77,4 +77,38 @@ public class CategoryController(CategoryRepository repository) : ControllerBase
 
         return Ok(response);
     }
+
+    [HttpPut("{id}")]
+    public IActionResult Update(Guid id, [FromBody] CreateCategoryRequest request)
+    {
+        var userId = GetCurrentUserId();
+        var existing = _repository.GetById(id, userId);
+        if (existing == null) return NotFound();
+
+        var type = request.Type.ToLower() == "income" ? TransactionType.Income : TransactionType.Expense;
+        var icon = string.IsNullOrWhiteSpace(request.Icon) ? FSharpOption<string>.None : FSharpOption<string>.Some(request.Icon);
+
+        var updated = CategoryModule.update(existing, request.Name, type, icon);
+        _repository.Save(updated, userId);
+
+        var response = new CategoryResponse(
+            updated.Id,
+            updated.Name,
+            updated.Type.ToString(),
+            OptionModule.IsSome(updated.Icon) ? updated.Icon.Value : null
+        );
+
+        return Ok(response);
+    }
+
+    [HttpDelete("{id}")]
+    public IActionResult Delete(Guid id)
+    {
+        var userId = GetCurrentUserId();
+        var existing = _repository.GetById(id, userId);
+        if (existing == null) return NotFound();
+
+        _repository.Delete(id, userId);
+        return NoContent();
+    }
 }

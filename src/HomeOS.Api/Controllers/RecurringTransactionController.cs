@@ -234,6 +234,25 @@ public class RecurringTransactionController(
         return Ok(new { generatedCount = count, targetDate });
     }
 
+    /// <summary>
+    /// Get generation status and statistics
+    /// </summary>
+    [HttpGet("status")]
+    public IActionResult GetStatus()
+    {
+        var userId = GetCurrentUserId();
+        var stats = _service.GetGenerationStats(userId);
+
+        return Ok(new
+        {
+            activeRecurrences = stats.ActiveCount,
+            totalRecurrences = stats.TotalCount,
+            nextOccurrenceDate = stats.NextDueDate,
+            lastGeneration = stats.LastRunAt,
+            pendingGeneration = stats.PendingCount
+        });
+    }
+
     private RecurringTransactionResponse MapToResponse(RecurringTransaction r)
     {
         var amount = r.AmountType.IsFixed

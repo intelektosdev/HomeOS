@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using HomeOS.Domain.FinancialTypes;
 using HomeOS.Infra.Repositories;
+using HomeOS.Infra.Services;
 using HomeOS.Api.Contracts;
 using System.Security.Claims;
 
@@ -10,10 +11,16 @@ namespace HomeOS.Api.Controllers;
 [ApiController]
 [Route("api/transactions")]
 // [Authorize] // Disabled for local development
-public class TransactionController(TransactionRepository repository, CategoryRepository categoryRepository) : ControllerBase
+public class TransactionController(
+    TransactionRepository repository, 
+    CategoryRepository categoryRepository,
+    RecurringTransactionService recurringService,
+    ILogger<TransactionController> logger) : ControllerBase
 {
     private readonly TransactionRepository _repository = repository;
     private readonly CategoryRepository _categoryRepository = categoryRepository;
+    private readonly RecurringTransactionService _recurringService = recurringService;
+    private readonly ILogger<TransactionController> _logger = logger;
 
     // Fixed userId for local development without authentication
     private static readonly Guid FixedUserId = Guid.Parse("22f4bd46-313d-424a-83b9-0c367ad46c3b");
@@ -147,6 +154,21 @@ public class TransactionController(TransactionRepository repository, CategoryRep
         var startDate = start ?? new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
         var endDate = end ?? startDate.AddMonths(1).AddDays(-1);
 
+        // Auto-generate recurring transactions for the next 30 days
+        try
+        {
+            var generatedCount = _recurringService.GenerateTransactions(userId, DateTime.Today.AddDays(30));
+            if (generatedCount > 0)
+            {
+                _logger.LogInformation("Auto-generated {Count} recurring transactions for user {UserId}", generatedCount, userId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to auto-generate recurring transactions for user {UserId}", userId);
+            // Don't fail the request if generation fails - just log and continue
+        }
+
         var transactions = _repository.GetStatement(startDate, endDate, userId, categoryId, accountId);
 
         var response = transactions.Select(t => new
@@ -159,7 +181,10 @@ public class TransactionController(TransactionRepository repository, CategoryRep
             CategoryId = (Guid)t.CategoryId,
             AccountId = t.AccountId != null ? (Guid?)t.AccountId : null,
             CreditCardId = t.CreditCardId != null ? (Guid?)t.CreditCardId : null,
-            BillPaymentId = t.BillPaymentId != null ? (Guid?)t.BillPaymentId : null
+            BillPaymentId = t.BillPaymentId != null ? (Guid?)t.BillPaymentId : null,
+            InstallmentId = t.InstallmentId != null ? (Guid?)t.InstallmentId : null,
+            InstallmentNumber = t.InstallmentNumber != null ? (int?)t.InstallmentNumber : null,
+            TotalInstallments = t.TotalInstallments != null ? (int?)t.TotalInstallments : null
         }).ToList();
 
         return Ok(response);
@@ -271,6 +296,17 @@ public class TransactionController(TransactionRepository repository, CategoryRep
         _repository.Save(updatedTransaction, userId);
 
         return Ok(MapToResponse(updatedTransaction));
+    }
+
+    [HttpDelete("{id}")]
+    public IActionResult Delete(Guid id)
+    {
+        var userId = GetCurrentUserId();
+        var existing = _repository.GetById(id, userId);
+        if (existing == null) return NotFound();
+
+        _repository.Delete(id, userId);
+        return NoContent();
     }
 
     private TransactionResponse MapToResponse(Transaction t)

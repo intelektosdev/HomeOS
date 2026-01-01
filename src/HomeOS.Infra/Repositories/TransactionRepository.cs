@@ -71,6 +71,7 @@ public class TransactionRepository(IConfiguration configuration)
         var sql = @"
         SELECT 
             Id, Description, Amount, Type, DueDate, CategoryId, AccountId, CreditCardId, BillPaymentId,
+            InstallmentId, InstallmentNumber, TotalInstallments,
             CASE 
                 WHEN StatusId = 1 THEN 'Pending'
                 WHEN StatusId = 2 THEN 'Paid'
@@ -218,6 +219,31 @@ public class TransactionRepository(IConfiguration configuration)
 
         using var connection = new SqlConnection(_connectionString);
         return connection.Query(sql, new { StartDate = startDate, EndDate = endDate, UserId = userId });
+    }
+
+    // Check if a transaction already exists for a specific recurring transaction and date (idempotency)
+    public virtual Transaction? GetByRecurringAndDate(Guid recurringId, DateTime dueDate, Guid userId)
+    {
+        const string sql = @"
+            SELECT t.*
+            FROM [Finance].[Transactions] t
+            INNER JOIN [Finance].[GeneratedTransactions] gt ON t.Id = gt.TransactionId
+            WHERE gt.RecurringTransactionId = @RecurringId 
+              AND t.UserId = @UserId
+              AND CAST(t.DueDate AS DATE) = CAST(@DueDate AS DATE)";
+
+        using var connection = new SqlConnection(_connectionString);
+        var dbModel = connection.QuerySingleOrDefault<TransactionDbModel>(sql, new { RecurringId = recurringId, UserId = userId, DueDate = dueDate });
+
+        return dbModel == null ? null : TransactionMapper.ToDomain(dbModel);
+    }
+
+    public void Delete(Guid id, Guid userId)
+    {
+        const string sql = "DELETE FROM [Finance].[Transactions] WHERE Id = @Id AND UserId = @UserId";
+        using var connection = new SqlConnection(_connectionString);
+        connection.Open();
+        connection.Execute(sql, new { Id = id, UserId = userId });
     }
 }
 

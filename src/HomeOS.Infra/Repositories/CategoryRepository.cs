@@ -54,4 +54,12 @@ public class CategoryRepository(IConfiguration configuration)
 
         return dbModels.Select(CategoryMapper.ToDomain);
     }
+
+    public void Delete(Guid id, Guid userId)
+    {
+        const string sql = "DELETE FROM [Finance].[Categories] WHERE Id = @Id AND UserId = @UserId";
+        using var connection = new SqlConnection(_connectionString);
+        connection.Open();
+        connection.Execute(sql, new { Id = id, UserId = userId });
+    }
 }

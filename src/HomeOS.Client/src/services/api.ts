@@ -148,6 +148,9 @@ export const TransactionsService = {
         const data: ConciliateTransactionRequest = { conciliatedAt: date };
         const response = await api.post<TransactionResponse>(`/transactions/${id}/conciliate`, data);
         return response.data;
+    },
+    delete: async (id: string) => {
+        await api.delete(`/transactions/${id}`);
     }
 };
 

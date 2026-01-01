@@ -81,6 +81,12 @@ module CategoryModule =
           Type = catType
           Icon = icon }
 
+    let update (category: Category) (name: string) (catType: TransactionType) (icon: string option) =
+        { category with
+            Name = name
+            Type = catType
+            Icon = icon }
+
 module AccountModule =
     let create (name: string) (accType: AccountType) (initialBalance: Money) =
         { Id = Guid.NewGuid()
@@ -174,6 +180,33 @@ module TransactionModule =
                   InstallmentId = None
                   InstallmentNumber = None
                   TotalInstallments = None }
+
+    // Factory: Criação de uma nova receita
+    let createIncome
+        (description: string)
+        (amount: Money)
+        (dueDate: DateTime)
+        (categoryId: Guid)
+        (source: TransactionSource)
+        : Result<Transaction, DomainError> =
+        if amount <= 0m then
+            Error AmountMustBePositive
+        else
+            Ok
+                { Id = Guid.NewGuid()
+                  Description = description
+                  Type = Income
+                  Status = Pending
+                  Amount = amount
+                  DueDate = dueDate
+                  CreatedAt = DateTime.Now
+                  CategoryId = categoryId
+                  Source = source
+                  BillPaymentId = None
+                  InstallmentId = None
+                  InstallmentNumber = None
+                  TotalInstallments = None }
+
 
     // Função Pura: Recebe transação atual -> Retorna nova transação ou Erro
     let pay (transaction: Transaction) (paymentDate: DateTime) : Result<Transaction, DomainError> =

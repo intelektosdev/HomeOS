@@ -163,18 +163,143 @@ export const tryAutoSync = async () => {
         syncCategories(),
         syncAccounts(),
         syncCreditCards(),
-        syncShoppingList()
+        syncShoppingList(),
+        syncProductGroups()
     ]);
 
     // Upstream sync
     try {
         const result = await syncPendingTransactions();
-        if (result.success && result.syncedCount > 0) {
-            console.log(`Auto-sync completado: ${result.syncedCount} itens enviados.`);
+        const invResult = await syncProducts(); // This handles both up and down for products
+
+        let totalSynced = (result.success ? result.syncedCount : 0) + (invResult ? 1 : 0); // Simplified count
+
+        if (totalSynced > 0) {
+            console.log(`Auto-sync completado.`);
         }
         return result;
     } catch (e) {
         // Silent fail for auto-sync but return error state
         return { success: false, syncedCount: 0, error: e };
+    }
+};
+
+// --- Inventory Sync ---
+
+export const syncProductGroups = async () => {
+    try {
+        if (!await isConnected()) return false;
+        const groups = await import('./api').then(m => m.ProductGroupsService.getAll());
+        await import('./database').then(m => m.saveProductGroups(groups));
+        console.log(`Grupos de produtos sincronizados: ${groups.length}`);
+        return true;
+    } catch (error) {
+        console.error('Erro ao sincronizar grupos:', error);
+        return false;
+    }
+};
+
+export const syncProducts = async () => {
+    if (!await isConnected()) return false;
+
+    // 1. Process Upstream Queue (Offline Actions)
+    await processInventoryQueue();
+
+    // 2. Downstream Sync (Fetch latest from server)
+    try {
+        const products = await import('./api').then(m => m.ProductsService.getAll(true)); // Include inactive to sync status
+        await import('./database').then(m => m.saveProducts(products));
+        console.log(`Produtos sincronizados: ${products.length}`);
+        return true;
+    } catch (error) {
+        console.error('Erro ao baixar produtos:', error);
+        return false;
+    }
+};
+
+const processInventoryQueue = async () => {
+    // Import getDb to allow direct updates to pending items
+    const { getPendingInventoryUpdates, deletePendingInventoryUpdate, getDb } = await import('./database');
+    const { ProductsService } = await import('./api');
+
+    const queue = await getPendingInventoryUpdates();
+    if (queue.length === 0) return;
+
+    console.log(`Processando ${queue.length} ações de inventário offline...`);
+
+    // Map to track temporary local IDs -> Real Server IDs
+    const idMap = new Map<string, string>();
+
+    // Helper to replace IDs in pending items permanently in SQLite
+    const updatePendingItemsWithServerId = async (tempId: string, serverId: string) => {
+        const pending = await getPendingInventoryUpdates();
+
+        for (const item of pending) {
+            let payload = JSON.parse(item.payload);
+            let changed = false;
+
+            if (payload.id === tempId) { payload.id = serverId; changed = true; }
+            if (payload.productId === tempId) { payload.productId = serverId; changed = true; }
+            if (payload.productGroupId === tempId) { payload.productGroupId = serverId; changed = true; }
+
+            if (changed) {
+                const db = await getDb();
+                await db.runAsync('UPDATE pending_inventory_updates SET payload = ? WHERE id = ?', [JSON.stringify(payload), item.id]);
+                console.log(`Updated pending item ${item.type} with real server ID`);
+            }
+        }
+    };
+
+    for (const item of queue) {
+        try {
+            // Re-fetch payload to ensure freshness
+            const currentItem = (await getPendingInventoryUpdates()).find(i => i.id === item.id);
+            if (!currentItem) continue;
+
+            const payload = JSON.parse(currentItem.payload);
+
+            // Apply in-memory map locally too
+            if (payload.id && idMap.has(payload.id)) payload.id = idMap.get(payload.id);
+            if (payload.productGroupId && idMap.has(payload.productGroupId)) payload.productGroupId = idMap.get(payload.productGroupId);
+
+            if (item.type === 'CREATE_PRODUCT') {
+                // Sanitize Payload: Remove tempId before sending to API to avoid 400 Bad Request
+                const { tempId, ...apiPayload } = payload;
+
+                const response = await ProductsService.create(apiPayload);
+                const serverId = response.id;
+
+                if (tempId) {
+                    idMap.set(tempId, serverId);
+                    await updatePendingItemsWithServerId(tempId, serverId);
+                    console.log(`Mapped/Persisted Temp ID ${tempId} -> Server ID ${serverId}`);
+                }
+                await deletePendingInventoryUpdate(item.id);
+
+            } else if (item.type === 'UPDATE_PRODUCT') {
+                await ProductsService.update(payload.id, payload);
+                await deletePendingInventoryUpdate(item.id);
+
+            } else if (item.type === 'ADJUST_STOCK') {
+                await ProductsService.adjustStock(payload.id, payload.quantityChange);
+                await deletePendingInventoryUpdate(item.id);
+
+            } else if (item.type === 'CREATE_PRODUCT_GROUP') {
+                const { ProductGroupsService } = await import('./api');
+                // Sanitize
+                const { tempId, ...apiPayload } = payload;
+                const response = await ProductGroupsService.create(apiPayload);
+
+                if (tempId) {
+                    idMap.set(tempId, response.id);
+                    await updatePendingItemsWithServerId(tempId, response.id);
+                    console.log(`Mapped/Persisted Group Temp ID ${tempId} -> Server ID ${response.id}`);
+                }
+                await deletePendingInventoryUpdate(item.id);
+            }
+
+        } catch (error) {
+            console.error(`Falha ao processar item da fila ${item.id} (${item.type}):`, error);
+        }
     }
 };

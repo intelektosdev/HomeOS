@@ -40,7 +40,7 @@ services:
       context: .
       dockerfile: Dockerfile.client
       args:
-        - VITE_API_URL=${API_URL:-http://localhost:5050}/api
+        - VITE_API_URL=${API_URL:-http://192.168.15.13:5050}/api
     container_name: homeos-client
     ports:
       - "80:80"

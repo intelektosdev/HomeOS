@@ -3,8 +3,17 @@ import { type CreateTransactionRequest } from '../types';
 
 // Open the database asynchronously
 // connecting to 'homeos.db'
+// Singleton instance
+let dbInstance: SQLite.SQLiteDatabase | null = null;
+
+// Open the database asynchronously
+// connecting to 'homeos.db'
 export const getDb = async () => {
-    return await SQLite.openDatabaseAsync('homeos.db');
+    if (dbInstance) return dbInstance;
+    dbInstance = await SQLite.openDatabaseAsync('homeos.db', {
+        useNewConnection: false // ensure we share the connection if possible, though singleton covers it
+    });
+    return dbInstance;
 };
 
 export const initDatabase = async () => {
@@ -87,6 +96,34 @@ export const initDatabase = async () => {
             dueDay INTEGER,
             limit_amount REAL
         );
+
+        -- Tabela de Produtos (Sync)
+        CREATE TABLE IF NOT EXISTS products (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            unit TEXT,
+            categoryId TEXT,
+            productGroupId TEXT,
+            barcode TEXT,
+            stockQuantity REAL DEFAULT 0,
+            minStockAlert REAL,
+            isActive INTEGER DEFAULT 1,
+            is_synced INTEGER DEFAULT 1 -- 1 = synced from server, 0 = local change
+        );
+
+        -- Tabela de Grupos de Produtos (Cache)
+        CREATE TABLE IF NOT EXISTS product_groups (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL
+        );
+
+        -- Tabela de Atualizações de Estoque Pendentes (Offline Queue)
+        CREATE TABLE IF NOT EXISTS pending_inventory_updates (
+            id TEXT PRIMARY KEY NOT NULL,
+            type TEXT NOT NULL, -- 'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'ADJUST_STOCK'
+            payload TEXT NOT NULL, -- JSON
+            created_at TEXT DEFAULT (datetime('now'))
+        );
     `);
 
     console.log('Database initialized successfully');
@@ -107,14 +144,39 @@ export interface LocalShoppingItem {
     barcode?: string;
 }
 
+export interface LocalProduct {
+    id: string;
+    name: string;
+    unit: string;
+    categoryId?: string;
+    productGroupId?: string;
+    barcode?: string;
+    stockQuantity: number;
+    minStockAlert?: number;
+    isActive: number;
+    is_synced: number;
+}
+
+export interface LocalProductGroup {
+    id: string;
+    name: string;
+}
+
 export interface LocalPendingTransaction {
     id: string;
     payload: string;
     created_at: string;
 }
 
+export interface LocalPendingInventoryUpdate {
+    id: string;
+    type: 'CREATE_PRODUCT' | 'UPDATE_PRODUCT' | 'ADJUST_STOCK' | 'CREATE_PRODUCT_GROUP';
+    payload: string;
+    created_at: string;
+}
+
 // Polyfill for UUID generation in environments where crypto is not available
-const generateUUID = () => {
+export const generateUUID = () => {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
         const r = (Math.random() * 16) | 0;
         const v = c === 'x' ? r : (r & 0x3) | 0x8;
@@ -145,6 +207,45 @@ export const getPendingTransactions = async () => {
 export const deletePendingTransaction = async (id: string) => {
     const db = await getDb();
     await db.runAsync('DELETE FROM pending_transactions WHERE id = ?', [id]);
+};
+
+// --- Inventory Sync Queue Helpers ---
+
+export const savePendingInventoryUpdate = async (type: 'CREATE_PRODUCT' | 'UPDATE_PRODUCT' | 'ADJUST_STOCK' | 'CREATE_PRODUCT_GROUP', payload: any) => {
+    const db = await getDb();
+    const id = generateUUID();
+    const payloadStr = JSON.stringify(payload);
+
+    await db.runAsync(
+        'INSERT INTO pending_inventory_updates (id, type, payload) VALUES (?, ?, ?)',
+        [id, type, payloadStr]
+    );
+    return id;
+};
+
+// ...
+
+export const createLocalProductGroup = async (name: string) => {
+    const db = await getDb();
+    const id = generateUUID();
+    await db.runAsync(
+        'INSERT INTO product_groups (id, name) VALUES (?, ?)',
+        [id, name]
+    );
+    return id;
+};
+
+// Removed duplicate getProductGroups
+
+
+export const getPendingInventoryUpdates = async () => {
+    const db = await getDb();
+    return await db.getAllAsync<LocalPendingInventoryUpdate>('SELECT * FROM pending_inventory_updates ORDER BY created_at ASC', []);
+};
+
+export const deletePendingInventoryUpdate = async (id: string) => {
+    const db = await getDb();
+    await db.runAsync('DELETE FROM pending_inventory_updates WHERE id = ?', [id]);
 };
 
 // --- Shopping List CRUD ---
@@ -259,7 +360,7 @@ export const clearPurchasedItems = async () => {
     await db.runAsync('DELETE FROM shopping_items WHERE is_purchased = 1', []);
 };
 
-// --- SYNC HELPERS (Categories & Accounts) ---
+// --- SYNC HELPERS (Categories, Accounts, Products) ---
 
 export const saveCategories = async (categories: import('../types').CategoryResponse[]) => {
     const db = await getDb();
@@ -310,6 +411,93 @@ export const getAccounts = async () => {
     }
 };
 
+// --- PRODUCT SYNC & CRUD ---
+
+export const saveProducts = async (products: import('../types').Product[]) => {
+    const db = await getDb();
+    // For now clear all synced products to full refresh, but ideally we should merge
+    await db.runAsync('DELETE FROM products WHERE is_synced = 1', []);
+
+    for (const p of products) {
+        await db.runAsync(
+            `INSERT INTO products (id, name, unit, categoryId, productGroupId, barcode, stockQuantity, minStockAlert, isActive, is_synced) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+            [p.id, p.name, p.unit, p.categoryId || null, p.productGroupId || null, p.barcode || null, p.stockQuantity, p.minStockAlert || null, p.isActive ? 1 : 0]
+        );
+    }
+};
+
+export const saveProductGroups = async (groups: import('../types').ProductGroup[]) => {
+    const db = await getDb();
+    await db.runAsync('DELETE FROM product_groups', []);
+    for (const g of groups) {
+        await db.runAsync(
+            'INSERT INTO product_groups (id, name) VALUES (?, ?)',
+            [g.id, g.name]
+        );
+    }
+};
+
+export const getProducts = async () => {
+    try {
+        const db = await getDb();
+        return await db.getAllAsync<LocalProduct>('SELECT * FROM products ORDER BY name ASC', []);
+    } catch (error) {
+        console.error('Error in getProducts:', error);
+        return [];
+    }
+};
+
+export const getProductGroups = async () => {
+    try {
+        const db = await getDb();
+        return await db.getAllAsync<LocalProductGroup>('SELECT * FROM product_groups ORDER BY name ASC', []);
+    } catch (error) {
+        console.error('Error in getProductGroups:', error);
+        return [];
+    }
+};
+
+export const getProductByBarcode = async (barcode: string) => {
+    try {
+        const db = await getDb();
+        const rows = await db.getAllAsync<LocalProduct>('SELECT * FROM products WHERE barcode = ?', [barcode]);
+        if (rows.length > 0) {
+            return {
+                ...rows[0],
+                isActive: rows[0].isActive === 1
+            };
+        }
+        return null;
+    } catch (error) {
+        console.error('Error in getProductByBarcode:', error);
+        return null;
+    }
+};
+
+export const createLocalProduct = async (product: Partial<LocalProduct>) => {
+    const db = await getDb();
+    const id = generateUUID();
+    const name = product.name || 'Sem nome';
+    const unit = product.unit || 'un';
+    const stock = product.stockQuantity || 0;
+
+    await db.runAsync(
+        `INSERT INTO products (id, name, unit, categoryId, productGroupId, barcode, stockQuantity, minStockAlert, isActive, is_synced)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0)`,
+        [id, name, unit, product.categoryId || null, product.productGroupId || null, product.barcode || null, stock, product.minStockAlert || null]
+    );
+    return id;
+};
+
+export const updateLocalProductStock = async (id: string, newQuantity: number) => {
+    const db = await getDb();
+    await db.runAsync(
+        'UPDATE products SET stockQuantity = ?, is_synced = 0 WHERE id = ?',
+        [newQuantity, id]
+    );
+};
+
 // --- PRODUCT INTELLIGENCE ---
 
 export const getKnownProduct = async (barcode: string) => {
@@ -317,8 +505,6 @@ export const getKnownProduct = async (barcode: string) => {
     const results = await db.getAllAsync<{ barcode: string, name: string }>('SELECT * FROM known_products WHERE barcode = ?', [barcode]);
     return results.length > 0 ? results[0] : null;
 };
-
-
 
 export const saveKnownProduct = async (barcode: string, name: string) => {
     const db = await getDb();
@@ -361,4 +547,5 @@ export const saveCreditCards = async (cards: import('../types').CreditCardRespon
         );
     }
 };
+
 

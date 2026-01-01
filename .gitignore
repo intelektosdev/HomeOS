@@ -123,3 +123,6 @@ ipch/
 
 # Docker volumes
 sqldata/
+
+# Gradle Cache
+.gradle_local/

@@ -13,7 +13,8 @@ import {
     Settings,
     History,
     ScanBarcode as ScannerIcon,
-    Wallet
+    Wallet,
+    Package
 } from 'lucide-react-native';
 import { AnalyticsService } from '../services/api';
 import type { AnalyticsSummaryResponse } from '../types';
@@ -238,6 +239,13 @@ export default function Home() {
                         subtitle="Código Barras"
                         icon={<ScannerIcon size={24} color="#f59e0b" />}
                         bgColor="bg-amber-50"
+                    />
+                    <MenuButton
+                        href="/inventory"
+                        title="Estoque"
+                        subtitle="Controle"
+                        icon={<Package size={24} color="#ef4444" />}
+                        bgColor="bg-red-50"
                     />
                     <MenuButton
                         href="/history"

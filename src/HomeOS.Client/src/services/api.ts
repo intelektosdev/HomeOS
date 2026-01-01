@@ -23,7 +23,7 @@ import type {
 } from '../types';
 
 export const api = axios.create({
-    baseURL: 'http://localhost:5050/api', // Ajuste conforme porta real do backend
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5050/api',
     headers: {
         'Content-Type': 'application/json',
     },
@@ -62,6 +62,13 @@ export const CategoriesService = {
     create: async (data: CreateCategoryRequest) => {
         const response = await api.post<CategoryResponse>('/categories', data);
         return response.data;
+    },
+    update: async (id: string, data: CreateCategoryRequest) => {
+        const response = await api.put<CategoryResponse>(`/categories/${id}`, data);
+        return response.data;
+    },
+    delete: async (id: string) => {
+        await api.delete(`/categories/${id}`);
     }
 };
 

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ProductsService, CategoriesService, ProductGroupsService, type Product, type CreateProductRequest, type UpdateProductRequest, type ProductGroup } from '../services/api';
+import { ProductsService, CategoriesService, ProductGroupsService, ShoppingListService, type Product, type CreateProductRequest, type UpdateProductRequest, type ProductGroup } from '../services/api';
 import type { CategoryResponse } from '../types';
 
-type ViewMode = 'cards' | 'grid';
+type ViewMode = 'cards' | 'grid' | 'inventory';
 
 const unitOptions = [
     { value: 'un', label: 'Unidade (un)' },
@@ -21,6 +21,7 @@ export function Products() {
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [showInactive, setShowInactive] = useState(false);
+    const [isInventoryMode, setIsInventoryMode] = useState(false);
 
     const [formData, setFormData] = useState<CreateProductRequest>({
         name: '',
@@ -119,6 +120,39 @@ export function Products() {
         return `R$ ${price.toFixed(2)}`;
     };
 
+    const handleAddLowStockToShoppingList = async () => {
+        const lowStock = products.filter(p => p.isActive && p.minStockAlert && p.stockQuantity <= p.minStockAlert);
+        if (lowStock.length === 0) {
+            alert('Não há itens com estoque baixo para adicionar.');
+            return;
+        }
+
+        if (!window.confirm(`Deseja adicionar ${lowStock.length} itens à lista de compras?`)) return;
+
+        try {
+            await Promise.all(lowStock.map(p =>
+                ShoppingListService.addItem({
+                    productId: p.id,
+                    name: p.name,
+                    quantity: (p.minStockAlert || 1) * 2 - p.stockQuantity,
+                    unit: p.unit
+                })
+            ));
+            alert('Itens adicionados com sucesso!');
+        } catch (error) {
+            console.error('Erro ao adicionar à lista', error);
+        }
+    };
+
+    const getStockHealth = (p: Product) => {
+        if (!p.minStockAlert) return { percentage: 100, color: 'var(--text-secondary)' };
+        const percentage = Math.min(100, (p.stockQuantity / (p.minStockAlert * 2)) * 100);
+        let color = 'var(--color-success)';
+        if (p.stockQuantity <= p.minStockAlert) color = 'var(--color-danger)';
+        else if (p.stockQuantity <= p.minStockAlert * 1.5) color = 'var(--warning-color)';
+        return { percentage, color };
+    };
+
     const lowStockProducts = products.filter(p =>
         p.minStockAlert && p.stockQuantity <= p.minStockAlert && p.isActive
     );
@@ -166,13 +200,49 @@ export function Products() {
                 </div>
             </header>
 
-            {/* Low Stock Alert */}
-            {lowStockProducts.length > 0 && (
-                <div className="glass-panel" style={{ marginBottom: '1.5rem', borderLeft: '4px solid #f59e0b' }}>
-                    <h3 style={{ color: '#f59e0b', marginBottom: '0.5rem' }}>⚠️ Estoque Baixo</h3>
-                    <p style={{ color: 'var(--text-secondary)' }}>
-                        {lowStockProducts.map(p => p.name).join(', ')}
-                    </p>
+            {/* Inventory Dashboard KPIs */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+                <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center', borderBottom: '3px solid var(--color-danger)' }}>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Itens Críticos</div>
+                    <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-danger)' }}>{lowStockProducts.length}</div>
+                </div>
+                <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center', borderBottom: '3px solid var(--color-primary)' }}>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Total de Itens</div>
+                    <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-primary)' }}>{products.filter(p => p.isActive).length}</div>
+                </div>
+                <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center', borderBottom: '3px solid var(--color-success)' }}>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Em Dia</div>
+                    <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-success)' }}>
+                        {products.filter(p => p.isActive && (!p.minStockAlert || p.stockQuantity > p.minStockAlert)).length}
+                    </div>
+                </div>
+                <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.5rem' }}>
+                    <button className="btn btn-secondary btn-lg" style={{ width: '100%' }} onClick={handleAddLowStockToShoppingList}>
+                        🛒 Repor Itens Baixos
+                    </button>
+                    <button
+                        className={`btn btn-lg ${isInventoryMode ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{ width: '100%' }}
+                        onClick={() => {
+                            setIsInventoryMode(!isInventoryMode);
+                            if (!isInventoryMode) setViewMode('inventory');
+                            else setViewMode('grid');
+                        }}
+                    >
+                        📋 {isInventoryMode ? 'Sair do Modo Contagem' : 'Iniciar Contagem'}
+                    </button>
+                </div>
+            </div>
+
+            {/* Low Stock Alert - Refined */}
+            {lowStockProducts.length > 0 && !isInventoryMode && (
+                <div className="glass-panel glass-panel-danger" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+                        <div>
+                            <strong>Estoque Crítico:</strong> {lowStockProducts.map(p => p.name).join(', ')}
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -276,7 +346,62 @@ export function Products() {
             )}
 
             {/* Products View */}
-            {viewMode === 'cards' ? (
+            {viewMode === 'inventory' ? (
+                <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+                    <div style={{ padding: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3>📋 Checklist de Inventário</h3>
+                        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Clique nos botões para ajustar as quantidades rapidamente</p>
+                    </div>
+                    {products.filter(p => p.isActive).map(product => {
+                        const health = getStockHealth(product);
+                        return (
+                            <div key={product.id} style={{
+                                padding: '1rem 1.5rem',
+                                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '1.5rem',
+                                transition: 'background 0.2s',
+                                background: product.stockQuantity <= (product.minStockAlert || 0) ? 'rgba(239, 68, 68, 0.03)' : 'transparent'
+                            }}>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: 600, fontSize: '1.1rem' }}>{product.name}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{getCategoryName(product.categoryId)}</div>
+                                </div>
+
+                                <div style={{ width: '150px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+                                        <span style={{ color: health.color }}>{product.stockQuantity.toFixed(1)} {product.unit}</span>
+                                        <span style={{ color: 'var(--text-muted)' }}>mín: {product.minStockAlert || 0}</span>
+                                    </div>
+                                    <div className="progress-bar-container" style={{ height: '6px', background: 'rgba(255,255,255,0.05)' }}>
+                                        <div className="progress-bar" style={{
+                                            width: `${health.percentage}%`,
+                                            background: health.color,
+                                            boxShadow: `0 0 10px ${health.color}44`
+                                        }}></div>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <button className="btn-icon" style={{ width: '40px', height: '40px', fontSize: '1.25rem' }} onClick={() => handleAdjustStock(product.id, -1)}>-</button>
+                                    <div style={{ width: '60px', textAlign: 'center', fontWeight: 800, fontSize: '1.2rem' }}>
+                                        {product.stockQuantity.toFixed(0)}
+                                    </div>
+                                    <button className="btn-icon" style={{ width: '40px', height: '40px', fontSize: '1.25rem' }} onClick={() => handleAdjustStock(product.id, 1)}>+</button>
+                                </div>
+
+                                <button className="btn btn-text" style={{ padding: '0.5rem' }} onClick={() => {
+                                    const val = window.prompt(`Novo estoque para ${product.name}:`, product.stockQuantity.toString());
+                                    if (val !== null) handleAdjustStock(product.id, Number(val) - product.stockQuantity);
+                                }}>
+                                    🖍️ Set
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : viewMode === 'cards' ? (
                 <div className="products-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
                     {products.length === 0 ? (
                         <div className="glass-panel">
@@ -292,9 +417,9 @@ export function Products() {
                                     position: 'relative'
                                 }}
                             >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                                     <div>
-                                        <h4 style={{ marginBottom: '0.25rem' }}>{product.name}</h4>
+                                        <h4 className="product-card-title">{product.name}</h4>
                                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
                                             {getCategoryName(product.categoryId)}
                                         </span>
@@ -324,32 +449,32 @@ export function Products() {
                                     </div>
                                 </div>
 
-                                <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
                                     <button
-                                        className="btn btn-secondary"
-                                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.875rem' }}
+                                        className="btn-icon"
                                         onClick={() => handleAdjustStock(product.id, -1)}
+                                        title="Remover 1"
                                     >
-                                        -1
+                                        -
                                     </button>
                                     <button
-                                        className="btn btn-secondary"
-                                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.875rem' }}
+                                        className="btn-icon"
                                         onClick={() => handleAdjustStock(product.id, 1)}
+                                        title="Adicionar 1"
                                     >
-                                        +1
+                                        +
                                     </button>
                                     <button
-                                        className="btn btn-secondary"
-                                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.875rem' }}
+                                        className="btn-icon"
                                         onClick={() => handleEdit(product)}
+                                        title="Editar"
                                     >
                                         ✏️
                                     </button>
                                     <button
-                                        className="btn btn-secondary"
-                                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.875rem' }}
+                                        className={`btn-icon ${product.isActive ? 'btn-icon-danger' : ''}`}
                                         onClick={() => handleToggle(product.id)}
+                                        title={product.isActive ? 'Desativar' : 'Ativar'}
                                     >
                                         {product.isActive ? '❌' : '✅'}
                                     </button>
@@ -363,7 +488,7 @@ export function Products() {
                     {products.length === 0 ? (
                         <p className="empty-state">Nenhum produto cadastrado. Crie seu primeiro produto!</p>
                     ) : (
-                        <table>
+                        <table className="table">
                             <thead>
                                 <tr>
                                     <th>Nome</th>
@@ -372,7 +497,7 @@ export function Products() {
                                     <th>Estoque</th>
                                     <th>Último Preço</th>
                                     <th>Status</th>
-                                    <th>Ações</th>
+                                    <th style={{ textAlign: 'center' }}>Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -383,8 +508,9 @@ export function Products() {
                                         <td>{product.unit}</td>
                                         <td>
                                             <span style={{
+                                                fontWeight: 'bold',
                                                 color: product.minStockAlert && product.stockQuantity <= product.minStockAlert
-                                                    ? '#f59e0b'
+                                                    ? 'var(--color-danger)'
                                                     : 'inherit'
                                             }}>
                                                 {product.stockQuantity.toFixed(1)}
@@ -397,11 +523,11 @@ export function Products() {
                                             </span>
                                         </td>
                                         <td>
-                                            <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                                <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleAdjustStock(product.id, -1)}>-1</button>
-                                                <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleAdjustStock(product.id, 1)}>+1</button>
-                                                <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleEdit(product)}>✏️</button>
-                                                <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleToggle(product.id)}>{product.isActive ? '❌' : '✅'}</button>
+                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                <button className="btn-icon" onClick={() => handleAdjustStock(product.id, -1)}>-</button>
+                                                <button className="btn-icon" onClick={() => handleAdjustStock(product.id, 1)}>+</button>
+                                                <button className="btn-icon" onClick={() => handleEdit(product)}>✏️</button>
+                                                <button className={`btn-icon ${product.isActive ? 'btn-icon-danger' : ''}`} onClick={() => handleToggle(product.id)}>{product.isActive ? '❌' : '✅'}</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -411,6 +537,7 @@ export function Products() {
                     )}
                 </div>
             )}
+
         </div>
     );
 }

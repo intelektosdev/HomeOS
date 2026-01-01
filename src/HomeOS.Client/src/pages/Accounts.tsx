@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { AccountsService } from '../services/api';
-import type { AccountResponse, CreateAccountRequest, AccountType } from '../types';
+import { AccountsService, TransactionsService } from '../services/api';
+import type { AccountResponse, CreateAccountRequest, AccountType, TransactionResponse } from '../types';
 
 type ViewMode = 'cards' | 'grid';
 
 export function Accounts() {
     const [accounts, setAccounts] = useState<AccountResponse[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [accountBalances, setAccountBalances] = useState<Record<string, number>>({});
     const [showForm, setShowForm] = useState(false);
     const [viewMode, setViewMode] = useState<ViewMode>('cards');
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -18,12 +18,23 @@ export function Accounts() {
 
     const loadAccounts = async () => {
         try {
-            const data = await AccountsService.getAll();
-            setAccounts(data);
+            const [accountsData, transactionsData] = await Promise.all([
+                AccountsService.getAll(),
+                TransactionsService.getAll()
+            ]);
+
+            setAccounts(accountsData);
+
+            // Calculate balances
+            const balances: Record<string, number> = {};
+            accountsData.forEach((acc: AccountResponse) => {
+                const accTransactions = transactionsData.filter((t: TransactionResponse) => t.accountId === acc.id);
+                const transactionsTotal = accTransactions.reduce((sum: number, t: TransactionResponse) => sum + t.amount, 0);
+                balances[acc.id] = acc.initialBalance + transactionsTotal;
+            });
+            setAccountBalances(balances);
         } catch (error) {
             console.error('Erro ao carregar contas', error);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -89,7 +100,9 @@ export function Accounts() {
         }
     };
 
-    if (loading) return <div className="page"><div className="loading">Carregando...</div></div>;
+    const totalNetWorth = accounts
+        .filter((acc: AccountResponse) => acc.isActive)
+        .reduce((sum: number, acc: AccountResponse) => sum + (accountBalances[acc.id] || 0), 0);
 
     return (
         <div className="page">
@@ -125,6 +138,25 @@ export function Accounts() {
                     </button>
                 </div>
             </header>
+
+            {/* Total Net Worth Card */}
+            <div className="glass-panel" style={{
+                marginBottom: '2rem',
+                padding: '2rem',
+                background: 'var(--gradient-primary)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                color: 'white'
+            }}>
+                <div>
+                    <p style={{ opacity: 0.9, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Patrimônio Total Especial</p>
+                    <h2 style={{ fontSize: '2.5rem', fontWeight: 800, margin: 0, color: 'white' }}>
+                        {totalNetWorth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </h2>
+                </div>
+                <div style={{ fontSize: '3rem', opacity: 0.3 }}>🏦</div>
+            </div>
 
             {showForm && (
                 <div className="glass-panel" style={{ marginBottom: '2rem' }}>
@@ -190,38 +222,60 @@ export function Accounts() {
                             <p className="empty-state">Nenhuma conta cadastrada. Crie sua primeira conta!</p>
                         </div>
                     ) : (
-                        accounts.map(account => (
-                            <div key={account.id} className={`account-card glass-panel ${!account.isActive ? 'inactive' : ''}`}>
-                                <div className="account-header">
-                                    <span className="account-icon">{getAccountIcon(account.type)}</span>
-                                    <div className="account-info">
-                                        <h3 className="account-name">{account.name}</h3>
-                                        <p className="account-type">{getAccountTypeLabel(account.type)}</p>
+                        accounts.map(account => {
+                            const currentBalance = accountBalances[account.id] || 0;
+                            return (
+                                <div key={account.id} className={`account-card glass-panel ${!account.isActive ? 'inactive' : ''}`}>
+                                    <div className="account-header">
+                                        <span className="account-icon">{getAccountIcon(account.type)}</span>
+                                        <div className="account-info">
+                                            <h3 className="account-name">{account.name}</h3>
+                                            <p className="account-type">{getAccountTypeLabel(account.type)}</p>
+                                        </div>
+                                        <div className="account-status">
+                                            <span className={`status-badge ${account.isActive ? 'active' : 'inactive'}`}>
+                                                {account.isActive ? 'Ativa' : 'Inativa'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="account-balance" style={{
+                                        backgroundColor: 'rgba(255,255,255,0.03)',
+                                        border: '1px solid rgba(255,255,255,0.05)'
+                                    }}>
+                                        <div>
+                                            <span className="balance-label">Saldo Atual</span>
+                                            <div style={{
+                                                fontSize: '1.75rem',
+                                                fontWeight: 700,
+                                                color: currentBalance >= 0 ? 'var(--color-success)' : 'var(--color-danger)'
+                                            }}>
+                                                {currentBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Saldo inicial:</span>
+                                        <span>{account.initialBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                    </div>
+                                    <div className="account-actions">
+                                        <button
+                                            className="btn btn-text"
+                                            onClick={() => handleEdit(account)}
+                                            style={{ color: 'var(--color-text-secondary)', fontSize: '0.8rem' }}
+                                        >
+                                            ✏️ Editar
+                                        </button>
+                                        <button
+                                            className={`btn btn-text ${account.isActive ? 'btn-deactivate' : 'btn-activate'}`}
+                                            onClick={() => handleToggleStatus(account.id)}
+                                            style={{ fontSize: '0.8rem' }}
+                                        >
+                                            {account.isActive ? '🔴 Desabilitar' : '🟢 Reativar'}
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="account-balance">
-                                    <span className="balance-label">Saldo inicial</span>
-                                    <span className="balance-value">
-                                        R$ {account.initialBalance.toFixed(2)}
-                                    </span>
-                                </div>
-                                <div className="account-actions">
-                                    <button
-                                        className="btn-edit"
-                                        onClick={() => handleEdit(account)}
-                                        title="Editar conta"
-                                    >
-                                        ✏️ Editar
-                                    </button>
-                                    <button
-                                        className={`btn-toggle ${account.isActive ? 'btn-deactivate' : 'btn-activate'}`}
-                                        onClick={() => handleToggleStatus(account.id)}
-                                    >
-                                        {account.isActive ? '🔴 Desabilitar' : '🟢 Habilitar'}
-                                    </button>
-                                </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             ) : (
@@ -234,50 +288,48 @@ export function Accounts() {
                                 <tr>
                                     <th>Conta</th>
                                     <th>Tipo</th>
-                                    <th>Saldo Inicial</th>
-                                    <th>Status</th>
-                                    <th>Ações</th>
+                                    <th style={{ textAlign: 'right' }}>Saldo Atual</th>
+                                    <th style={{ textAlign: 'right' }}>Saldo Inicial</th>
+                                    <th style={{ textAlign: 'center' }}>Status</th>
+                                    <th style={{ textAlign: 'right' }}>Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {accounts.map(account => (
-                                    <tr key={account.id} className={!account.isActive ? 'inactive-row' : ''}>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                <span style={{ fontSize: '1.5rem' }}>{getAccountIcon(account.type)}</span>
-                                                <strong>{account.name}</strong>
-                                            </div>
-                                        </td>
-                                        <td>{getAccountTypeLabel(account.type)}</td>
-                                        <td>
-                                            <span className="amount-value">R$ {account.initialBalance.toFixed(2)}</span>
-                                        </td>
-                                        <td>
-                                            {account.isActive ? (
-                                                <span className="status-badge active">✓ Ativa</span>
-                                            ) : (
-                                                <span className="status-badge inactive">✕ Inativa</span>
-                                            )}
-                                        </td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                <button
-                                                    className="btn-toggle-small"
-                                                    onClick={() => handleEdit(account)}
-                                                    title="Editar"
-                                                >
-                                                    ✏️
-                                                </button>
-                                                <button
-                                                    className={`btn-toggle-small ${account.isActive ? 'btn-deactivate' : 'btn-activate'}`}
-                                                    onClick={() => handleToggleStatus(account.id)}
-                                                >
-                                                    {account.isActive ? 'Desabilitar' : 'Habilitar'}
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {accounts.map(account => {
+                                    const currentBalance = accountBalances[account.id] || 0;
+                                    return (
+                                        <tr key={account.id} className={!account.isActive ? 'inactive-row' : ''}>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                    <span style={{ fontSize: '1.5rem' }}>{getAccountIcon(account.type)}</span>
+                                                    <strong>{account.name}</strong>
+                                                </div>
+                                            </td>
+                                            <td>{getAccountTypeLabel(account.type)}</td>
+                                            <td style={{ textAlign: 'right' }}>
+                                                <strong style={{ color: currentBalance >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                                                    {currentBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                </strong>
+                                            </td>
+                                            <td style={{ textAlign: 'right', opacity: 0.6 }}>
+                                                {account.initialBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <span className={`status-badge ${account.isActive ? 'active' : 'inactive'}`}>
+                                                    {account.isActive ? 'Ativa' : 'Inativa'}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                    <button className="btn-icon" onClick={() => handleEdit(account)}>✏️</button>
+                                                    <button className="btn-icon" onClick={() => handleToggleStatus(account.id)}>
+                                                        {account.isActive ? '🚫' : '✅'}
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     )}

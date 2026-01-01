@@ -8,6 +8,7 @@ type GroupBy = 'category' | 'account' | 'status';
 
 export function Dashboard() {
     const [summary, setSummary] = useState<AnalyticsSummaryResponse | null>(null);
+    const [prevSummary, setPrevSummary] = useState<AnalyticsSummaryResponse | null>(null);
     const [debtStats, setDebtStats] = useState<DebtStatistics | null>(null);
     const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
     const [loading, setLoading] = useState(true);
@@ -45,6 +46,23 @@ export function Dashboard() {
         return { start: start.toISOString().split('T')[0], end };
     };
 
+    const getPreviousPeriodDates = (_period: PeriodFilter, start: string, end: string): { start: string; end: string } => {
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        const diffDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+        const prevEndDate = new Date(startDate);
+        prevEndDate.setDate(startDate.getDate() - 1);
+
+        const prevStartDate = new Date(prevEndDate);
+        prevStartDate.setDate(prevEndDate.getDate() - diffDays + 1);
+
+        return {
+            start: prevStartDate.toISOString().split('T')[0],
+            end: prevEndDate.toISOString().split('T')[0]
+        };
+    };
+
     useEffect(() => {
         loadSummary();
     }, [periodFilter, groupBy, customStartDate, customEndDate]);
@@ -53,15 +71,19 @@ export function Dashboard() {
         setLoading(true);
         try {
             const { start, end } = getPeriodDates(periodFilter);
-            if (!start || !end) return; // Skip if custom dates not set
+            if (!start || !end) return;
 
-            const [summaryData, debtData, portfolioData] = await Promise.all([
+            const { start: pStart, end: pEnd } = getPreviousPeriodDates(periodFilter, start, end);
+
+            const [summaryData, prevSummaryData, debtData, portfolioData] = await Promise.all([
                 AnalyticsService.getSummary(start, end, groupBy),
+                AnalyticsService.getSummary(pStart, pEnd, groupBy),
                 DebtsService.getStatistics(),
                 InvestmentsService.getPortfolio()
             ]);
 
             setSummary(summaryData);
+            setPrevSummary(prevSummaryData);
             setDebtStats(debtData);
             setPortfolio(portfolioData);
         } catch (error) {
@@ -173,32 +195,116 @@ export function Dashboard() {
                 </div>
             </div>
 
-            {/* KPI Cards */}
+            {/* KPI Cards & Insights */}
             {summary && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-                    <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Receitas</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--income-color)' }}>
+                    {/* Receitas */}
+                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Receitas</span>
+                            {prevSummary && (
+                                <span className={`badge ${summary.totalIncome >= prevSummary.totalIncome ? 'income' : 'expense'}`} style={{ fontSize: '0.75rem' }}>
+                                    {summary.totalIncome >= prevSummary.totalIncome ? '▲' : '▼'}
+                                    {Math.abs(((summary.totalIncome - prevSummary.totalIncome) / (prevSummary.totalIncome || 1)) * 100).toFixed(0)}%
+                                </span>
+                            )}
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--income-color)' }}>
                             {summary.totalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </div>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>vs. período anterior</p>
                     </div>
-                    <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Despesas</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--expense-color)' }}>
+
+                    {/* Despesas */}
+                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Despesas</span>
+                            {prevSummary && (
+                                <span className={`badge ${summary.totalExpense <= prevSummary.totalExpense ? 'income' : 'expense'}`} style={{ fontSize: '0.75rem' }}>
+                                    {summary.totalExpense <= prevSummary.totalExpense ? '▼' : '▲'}
+                                    {Math.abs(((summary.totalExpense - prevSummary.totalExpense) / (prevSummary.totalExpense || 1)) * 100).toFixed(0)}%
+                                </span>
+                            )}
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--expense-color)' }}>
                             {summary.totalExpense.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </div>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>vs. período anterior</p>
                     </div>
-                    <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Saldo</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 'bold', color: summary.balance >= 0 ? 'var(--income-color)' : 'var(--expense-color)' }}>
+
+                    {/* Saldo */}
+                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Saldo</span>
+                            <span className="badge" style={{ backgroundColor: summary.balance >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)' }}>
+                                {summary.balance >= 0 ? 'Positivo' : 'Negativo'}
+                            </span>
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: 800, color: summary.balance >= 0 ? 'var(--income-color)' : 'var(--expense-color)' }}>
                             {summary.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </div>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>Líquido no período</p>
                     </div>
-                    <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Pendentes</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--warning-color)' }}>
-                            {summary.pendingCount}
+
+                    {/* Taxa de Poupança */}
+                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Taxa de Poupança</div>
+                        <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-primary)' }}>
+                            {summary.totalIncome > 0
+                                ? Math.max(0, ((summary.totalIncome - summary.totalExpense) / summary.totalIncome) * 100).toFixed(0)
+                                : '0'}%
                         </div>
+                        <div className="progress-bar-container" style={{ height: '4px', background: 'rgba(255,255,255,0.05)', marginTop: '0.5rem' }}>
+                            <div className="progress-bar" style={{
+                                width: `${Math.max(0, Math.min(100, (summary.totalIncome > 0 ? ((summary.totalIncome - summary.totalExpense) / summary.totalIncome) * 100 : 0)))}%`,
+                                background: 'var(--gradient-primary)'
+                            }}></div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* AI Insights Section */}
+            {summary && (
+                <div className="glass-panel" style={{ marginBottom: '2rem', background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                    <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        ✨ Insights Financeiros
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+                        {summary.balance > 0 ? (
+                            <div style={{ padding: '1rem', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                                <strong style={{ color: 'var(--income-color)', display: 'block', marginBottom: '0.25rem' }}>Bom trabalho!</strong>
+                                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                    Você economizou {((summary.balance / summary.totalIncome) * 100).toFixed(0)}% da sua renda este mês.
+                                    Considere investir o excedente para acelerar seus objetivos.
+                                </p>
+                            </div>
+                        ) : (
+                            <div style={{ padding: '1rem', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                <strong style={{ color: 'var(--expense-color)', display: 'block', marginBottom: '0.25rem' }}>Atenção ao Saldo</strong>
+                                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                    Suas despesas superaram suas receitas neste período. Verifique as maiores categorias abaixo para encontrar oportunidades de economia.
+                                </p>
+                            </div>
+                        )}
+
+                        {prevSummary && summary.totalExpense < prevSummary.totalExpense && (
+                            <div style={{ padding: '1rem', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                                <strong style={{ color: 'var(--income-color)', display: 'block', marginBottom: '0.25rem' }}>Redução de Gastos</strong>
+                                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                    Suas despesas caíram {(((prevSummary.totalExpense - summary.totalExpense) / prevSummary.totalExpense) * 100).toFixed(0)}% em relação ao período anterior. Continue assim!
+                                </p>
+                            </div>
+                        )}
+
+                        {summary.pendingCount > 0 && (
+                            <div style={{ padding: '1rem', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                                <strong style={{ color: 'var(--warning-color)', display: 'block', marginBottom: '0.25rem' }}>Contas Pendentes</strong>
+                                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                    Você tem {summary.pendingCount} transações pendentes. Não esqueça de conciliar para manter seus dados precisos.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

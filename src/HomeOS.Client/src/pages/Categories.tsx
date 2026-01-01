@@ -9,6 +9,7 @@ export function Categories() {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [viewMode, setViewMode] = useState<ViewMode>('cards');
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState<CreateCategoryRequest>({
         name: '',
         type: 'Expense',
@@ -30,15 +31,45 @@ export function Categories() {
         loadCategories();
     }, []);
 
+    const resetForm = () => {
+        setFormData({ name: '', type: 'Expense', icon: '📌' });
+        setShowForm(false);
+        setEditingId(null);
+    };
+
+    const handleEdit = (category: CategoryResponse) => {
+        setEditingId(category.id);
+        setFormData({
+            name: category.name,
+            type: category.type as TransactionType,
+            icon: category.icon || '📌'
+        });
+        setShowForm(true);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('Tem certeza que deseja excluir esta categoria?')) return;
+        try {
+            await CategoriesService.delete(id);
+            loadCategories();
+        } catch (error) {
+            console.error('Erro ao excluir categoria', error);
+            alert('Não foi possível excluir a categoria. Verifique se existem transações vinculadas a ela.');
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await CategoriesService.create(formData);
-            setFormData({ name: '', type: 'Expense', icon: '📌' });
-            setShowForm(false);
+            if (editingId) {
+                await CategoriesService.update(editingId, formData);
+            } else {
+                await CategoriesService.create(formData);
+            }
+            resetForm();
             loadCategories();
         } catch (error) {
-            console.error('Erro ao criar categoria', error);
+            console.error('Erro ao salvar categoria', error);
         }
     };
 
@@ -77,7 +108,7 @@ export function Categories() {
 
                     <button
                         className="btn btn-primary"
-                        onClick={() => setShowForm(!showForm)}
+                        onClick={() => { if (showForm && editingId) resetForm(); else setShowForm(!showForm); }}
                     >
                         {showForm ? '✕ Cancelar' : '+ Nova Categoria'}
                     </button>
@@ -86,7 +117,7 @@ export function Categories() {
 
             {showForm && (
                 <div className="glass-panel" style={{ marginBottom: '2rem' }}>
-                    <h3 style={{ marginBottom: '1.5rem' }}>Nova Categoria</h3>
+                    <h3 style={{ marginBottom: '1.5rem' }}>{editingId ? 'Editar Categoria' : 'Nova Categoria'}</h3>
                     <form onSubmit={handleSubmit} className="form">
                         <div className="form-row">
                             <div className="form-group" style={{ flex: 2 }}>
@@ -128,9 +159,16 @@ export function Categories() {
                             </div>
                         </div>
 
-                        <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>
-                            Salvar Categoria
-                        </button>
+                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                            <button type="submit" className="btn btn-primary">
+                                {editingId ? 'Atualizar' : 'Salvar'} Categoria
+                            </button>
+                            {editingId && (
+                                <button type="button" className="btn btn-secondary" onClick={resetForm}>
+                                    Cancelar Edição
+                                </button>
+                            )}
+                        </div>
                     </form>
                 </div>
             )}
@@ -147,9 +185,15 @@ export function Categories() {
                                 <p className="empty-state">Nenhuma categoria de receita cadastrada</p>
                             ) : (
                                 incomeCategories.map(cat => (
-                                    <div key={cat.id} className="category-card">
-                                        <span className="category-icon">{cat.icon || '📌'}</span>
-                                        <span className="category-name">{cat.name}</span>
+                                    <div key={cat.id} className="category-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            <span className="category-icon">{cat.icon || '📌'}</span>
+                                            <span className="category-name">{cat.name}</span>
+                                        </div>
+                                        <div className="category-actions" style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <button className="btn-icon" onClick={() => handleEdit(cat)} title="Editar">✏️</button>
+                                            <button className="btn-icon" onClick={() => handleDelete(cat.id)} title="Excluir">🗑️</button>
+                                        </div>
                                     </div>
                                 ))
                             )}
@@ -157,7 +201,7 @@ export function Categories() {
                     </div>
 
                     <div className="glass-panel">
-                        <h3 className="section-title">
+                        <h3 className="section-title" style={{ color: 'var(--expense-color)' }}>
                             <span>📉 Despesas</span>
                             <span className="badge">{expenseCategories.length}</span>
                         </h3>
@@ -166,9 +210,15 @@ export function Categories() {
                                 <p className="empty-state">Nenhuma categoria de despesa cadastrada</p>
                             ) : (
                                 expenseCategories.map(cat => (
-                                    <div key={cat.id} className="category-card">
-                                        <span className="category-icon">{cat.icon || '📌'}</span>
-                                        <span className="category-name">{cat.name}</span>
+                                    <div key={cat.id} className="category-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            <span className="category-icon">{cat.icon || '📌'}</span>
+                                            <span className="category-name">{cat.name}</span>
+                                        </div>
+                                        <div className="category-actions" style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <button className="btn-icon" onClick={() => handleEdit(cat)} title="Editar">✏️</button>
+                                            <button className="btn-icon" onClick={() => handleDelete(cat.id)} title="Excluir">🗑️</button>
+                                        </div>
                                     </div>
                                 ))
                             )}
@@ -186,6 +236,7 @@ export function Categories() {
                                     <th>Ícone</th>
                                     <th>Nome</th>
                                     <th>Tipo</th>
+                                    <th style={{ textAlign: 'center' }}>Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -201,6 +252,12 @@ export function Categories() {
                                             <span className={`type-badge ${cat.type === 'Income' ? 'income' : 'expense'}`}>
                                                 {cat.type === 'Income' ? '📈 Receita' : '📉 Despesa'}
                                             </span>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                <button className="btn-icon" onClick={() => handleEdit(cat)} title="Editar">✏️</button>
+                                                <button className="btn-icon" onClick={() => handleDelete(cat.id)} title="Excluir">🗑️</button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

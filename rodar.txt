@@ -5,3 +5,7 @@ dotnet run
 cd C:\projetos\finance_dev\HomeOS\src\HomeOS.Client
 
 npm run dev
+
+cd C:\projetos\finance_dev\HomeOS\src\HomeOS.Mobile
+npx expo start --android -c
+npx expo start --android -c

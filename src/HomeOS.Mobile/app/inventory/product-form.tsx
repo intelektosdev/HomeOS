@@ -37,6 +37,13 @@ export default function ProductFormScreen() {
         loadRefs();
     }, []);
 
+    // Update barcode when returning from scanner
+    useEffect(() => {
+        if (params.barcode && typeof params.barcode === 'string') {
+            setBarcode(params.barcode);
+        }
+    }, [params.barcode]);
+
     const handleSave = async () => {
         if (!name.trim()) {
             Alert.alert("Erro", "Nome do produto é obrigatório");
@@ -132,7 +139,10 @@ export default function ProductFormScreen() {
                             onChangeText={setBarcode}
                             keyboardType="numeric"
                         />
-                        <TouchableOpacity className="ml-3 bg-blue-50 p-4 rounded-xl">
+                        <TouchableOpacity
+                            className="ml-3 bg-blue-50 p-4 rounded-xl"
+                            onPress={() => router.push('/inventory/barcode-scanner')}
+                        >
                             <ScanBarcode size={24} color="#3b82f6" />
                         </TouchableOpacity>
                     </View>

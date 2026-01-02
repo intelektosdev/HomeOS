@@ -53,8 +53,6 @@ public static class TransactionMapper
                 break;
             case 2: // Conciliated
                 dbModel.StatusId = 3;
-                var conciliated = (TransactionStatus.Conciliated)domain.Status;
-                dbModel.ConciliatedDate = conciliated.conciliatedAt;
                 break;
             case 3: // Cancelled
                 dbModel.StatusId = 4;
@@ -85,7 +83,7 @@ public static class TransactionMapper
         {
             1 => TransactionStatus.Pending,
             2 => TransactionStatus.NewPaid(db.PaymentDate ?? DateTime.MinValue),
-            3 => TransactionStatus.NewConciliated(db.ConciliatedDate ?? DateTime.MinValue),
+            3 => TransactionStatus.NewConciliated(db.PaymentDate ?? DateTime.MinValue),
             4 => TransactionStatus.NewCancelled(db.CancellationReason ?? string.Empty),
             _ => TransactionStatus.Pending // Fallback
         };

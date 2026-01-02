@@ -23,6 +23,5 @@ public class TransactionDbModel
     // Mapeamento dos Status (Flattening)
     public byte StatusId { get; set; }
     public DateTime? PaymentDate { get; set; }
-    public DateTime? ConciliatedDate { get; set; }
     public string? CancellationReason { get; set; }
 }

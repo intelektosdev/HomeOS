@@ -72,6 +72,7 @@ export function CreditCardDetails({ cardId, onClose, onPaymentSuccess }: CreditC
             setView('payment');
         } catch (error) {
             console.error('Error starting payment flow', error);
+            alert('Não foi possível iniciar o pagamento. Verifique se há faturas pendentes ou erro de conexão.');
         } finally {
             setLoading(false);
         }
@@ -124,7 +125,7 @@ export function CreditCardDetails({ cardId, onClose, onPaymentSuccess }: CreditC
         return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
     };
 
-    if (loading && !balance && view === 'details') return <div className="modal-overlay"><div className="modal-content glass-panel">Carregando...</div></div>;
+    if (loading && !balance && view === 'details') return <div className="modal-overlay"><div className="modal-content glass-panel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div></div>;
 
     const usedPercentage = balance ? Math.min((balance.usedLimit / balance.limit) * 100, 100) : 0;
 
@@ -133,7 +134,7 @@ export function CreditCardDetails({ cardId, onClose, onPaymentSuccess }: CreditC
             <div className="modal-content glass-panel" style={{ maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                     <h2 style={{ margin: 0 }}>
-                        {view === 'payment' ? 'Pagar Fatura' : balance?.name || 'Detalhes do Cartão'}
+                        {view === 'payment' ? 'Pagar Fatura' : (balance?.name || 'Detalhes do Cartão')}
                     </h2>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>✕</button>
                 </div>
@@ -158,33 +159,51 @@ export function CreditCardDetails({ cardId, onClose, onPaymentSuccess }: CreditC
                     </div>
                 )}
 
-                {view === 'details' && balance && (
+                {view === 'details' && (
                     <div className="details-view">
-                        <div className="limit-card" style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', marginBottom: '2rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                <span>Limite Utilizado</span>
-                                <strong>R$ {balance.usedLimit.toFixed(2)}</strong>
+                        {balance ? (
+                            <div className="limit-card" style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', marginBottom: '2rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                    <span>Limite Utilizado</span>
+                                    <strong>R$ {balance.usedLimit.toFixed(2)}</strong>
+                                </div>
+                                <div className="progress-bar-container" style={{ height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '6px', overflow: 'hidden', marginBottom: '0.5rem' }}>
+                                    <div
+                                        className="progress-bar"
+                                        style={{
+                                            width: `${usedPercentage}%`,
+                                            height: '100%',
+                                            background: usedPercentage > 80 ? 'var(--expense-color)' : 'var(--primary-color)',
+                                            transition: 'width 0.5s ease'
+                                        }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                    <span>Disponível: R$ {balance.availableLimit.toFixed(2)}</span>
+                                    <span>Total: R$ {balance.limit.toFixed(2)}</span>
+                                </div>
                             </div>
-                            <div className="progress-bar-container" style={{ height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '6px', overflow: 'hidden', marginBottom: '0.5rem' }}>
-                                <div
-                                    className="progress-bar"
-                                    style={{
-                                        width: `${usedPercentage}%`,
-                                        height: '100%',
-                                        background: usedPercentage > 80 ? 'var(--expense-color)' : 'var(--primary-color)',
-                                        transition: 'width 0.5s ease'
-                                    }}
-                                />
+                        ) : (
+                            <div className="limit-card" style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', marginBottom: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                <p>Não foi possível carregar os detalhes do limite.</p>
+                                <button
+                                    className="btn-text"
+                                    onClick={loadBalance}
+                                    style={{ color: 'var(--primary-color)', marginTop: '0.5rem' }}
+                                >
+                                    Tentar novamente
+                                </button>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                                <span>Disponível: R$ {balance.availableLimit.toFixed(2)}</span>
-                                <span>Total: R$ {balance.limit.toFixed(2)}</span>
-                            </div>
-                        </div>
+                        )}
 
                         <div className="actions" style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                            <button className="btn btn-primary" onClick={handleStartPayment} style={{ width: '100%' }}>
-                                Pagar Fatura
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleStartPayment}
+                                style={{ width: '100%' }}
+                                disabled={loading}
+                            >
+                                {loading ? 'Preparando Pagamento...' : 'Pagar Fatura'}
                             </button>
                         </div>
                     </div>

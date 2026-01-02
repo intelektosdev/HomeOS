@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useState } from 'react';
 import './Sidebar.css';
+import packageInfo from '../../package.json';
 
 export function Sidebar() {
     const { user, logout } = useAuth();
@@ -48,10 +49,20 @@ export function Sidebar() {
             <aside className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`}>
                 <div className="sidebar-header">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h2 className="sidebar-logo">
-                            <span className="logo-icon">💰</span>
-                            HomeOS
-                        </h2>
+                        <div>
+                            <h2 className="sidebar-logo">
+                                <span className="logo-icon">💰</span>
+                                HomeOS
+                            </h2>
+                            <div style={{
+                                fontSize: '0.75rem',
+                                color: 'var(--color-text-muted)',
+                                marginTop: '0.25rem',
+                                marginLeft: '2.5rem'
+                            }}>
+                                v{packageInfo.version}
+                            </div>
+                        </div>
                         {/* Close Button for Mobile */}
                         <button
                             className="mobile-close-btn"

@@ -30,7 +30,6 @@ public class TransactionRepository(IConfiguration configuration)
                     DueDate = @DueDate,
                     StatusId = @StatusId,
                     PaymentDate = @PaymentDate,
-                    ConciliatedDate = @ConciliatedDate,
                     CancellationReason = @CancellationReason,
                     CategoryId = @CategoryId,
                     AccountId = @AccountId,
@@ -40,8 +39,8 @@ public class TransactionRepository(IConfiguration configuration)
                     InstallmentNumber = @InstallmentNumber,
                     TotalInstallments = @TotalInstallments
             WHEN NOT MATCHED THEN
-                INSERT (Id, UserId, Description, Amount, Type, CategoryId, AccountId, CreditCardId, BillPaymentId, InstallmentId, InstallmentNumber, TotalInstallments, DueDate, StatusId, CreatedAt, PaymentDate, ConciliatedDate, CancellationReason)
-                VALUES (@Id, @UserId, @Description, @Amount, @Type, @CategoryId, @AccountId, @CreditCardId, @BillPaymentId, @InstallmentId, @InstallmentNumber, @TotalInstallments, @DueDate, @StatusId, @CreatedAt, @PaymentDate, @ConciliatedDate, @CancellationReason);";
+                INSERT (Id, UserId, Description, Amount, Type, CategoryId, AccountId, CreditCardId, BillPaymentId, InstallmentId, InstallmentNumber, TotalInstallments, DueDate, StatusId, CreatedAt, PaymentDate, CancellationReason)
+                VALUES (@Id, @UserId, @Description, @Amount, @Type, @CategoryId, @AccountId, @CreditCardId, @BillPaymentId, @InstallmentId, @InstallmentNumber, @TotalInstallments, @DueDate, @StatusId, @CreatedAt, @PaymentDate, @CancellationReason);";
 
         using var connection = new SqlConnection(_connectionString);
         connection.Open();
@@ -53,7 +52,7 @@ public class TransactionRepository(IConfiguration configuration)
         const string sql = @"
             SELECT 
                 Id, UserId, Description, Amount, Type, DueDate, CreatedAt,
-                StatusId, PaymentDate, ConciliatedDate, CancellationReason,
+                StatusId, PaymentDate, CancellationReason,
                 CategoryId, AccountId, CreditCardId, BillPaymentId,
                 InstallmentId, InstallmentNumber, TotalInstallments
             FROM [Finance].[Transactions]
@@ -157,8 +156,7 @@ public class TransactionRepository(IConfiguration configuration)
         const string sql = @"
         UPDATE [Finance].[Transactions]
         SET BillPaymentId = @BillPaymentId,
-            StatusId = 3,  -- Conciliated
-            ConciliatedDate = GETDATE()
+            StatusId = 3  -- Conciliated
         WHERE Id IN @TransactionIds 
             AND UserId = @UserId
             AND CreditCardId IS NOT NULL";
@@ -233,7 +231,7 @@ public class TransactionRepository(IConfiguration configuration)
               AND CAST(t.DueDate AS DATE) = CAST(@DueDate AS DATE)";
 
         using var connection = new SqlConnection(_connectionString);
-        var dbModel = connection.QuerySingleOrDefault<TransactionDbModel>(sql, new { RecurringId = recurringId, UserId = userId, DueDate = dueDate });
+        var dbModel = connection.QueryFirstOrDefault<TransactionDbModel>(sql, new { RecurringId = recurringId, UserId = userId, DueDate = dueDate });
 
         return dbModel == null ? null : TransactionMapper.ToDomain(dbModel);
     }

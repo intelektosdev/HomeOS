@@ -6,7 +6,7 @@ import { CreditCardDetails } from '../components/CreditCardDetails';
 type ViewMode = 'cards' | 'grid';
 
 export function CreditCards() {
-    const [creditCards, setCreditCards] = useState<CreditCardResponse[]>([]);
+    const [creditCards, setCreditCards] = useState<(CreditCardResponse & { availableLimit?: number; usedLimit?: number })[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [viewMode, setViewMode] = useState<ViewMode>('cards');
@@ -21,8 +21,20 @@ export function CreditCards() {
 
     const loadCreditCards = async () => {
         try {
-            const data = await CreditCardsService.getAll();
-            setCreditCards(data);
+            const cards = await CreditCardsService.getAll();
+
+            // Fetch balances for all cards
+            const cardsWithBalance = await Promise.all(cards.map(async (card) => {
+                try {
+                    const balance = await CreditCardsService.getBalance(card.id);
+                    return { ...card, availableLimit: balance.availableLimit, usedLimit: balance.usedLimit };
+                } catch (error) {
+                    console.error(`Erro ao carregar saldo do cartão ${card.id}`, error);
+                    return { ...card, availableLimit: card.limit, usedLimit: 0 }; // Fallback
+                }
+            }));
+
+            setCreditCards(cardsWithBalance);
         } catch (error) {
             console.error('Erro ao carregar cartões', error);
         } finally {
@@ -192,7 +204,7 @@ export function CreditCards() {
 
                                 <div className="card-limit">
                                     <span className="limit-label">Limite disponível</span>
-                                    <span className="limit-value">R$ {card.limit.toFixed(2)}</span>
+                                    <span className="limit-value">R$ {(card.availableLimit ?? card.limit).toFixed(2)}</span>
                                 </div>
 
                                 <div className="card-actions" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
@@ -248,7 +260,7 @@ export function CreditCards() {
                                             <span className="day-badge">Dia {card.dueDay}</span>
                                         </td>
                                         <td>
-                                            <span className="amount-value">R$ {card.limit.toFixed(2)}</span>
+                                            <span className="amount-value">R$ {(card.availableLimit ?? card.limit).toFixed(2)}</span>
                                         </td>
                                         <td>
                                             <button

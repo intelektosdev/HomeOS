@@ -3,9 +3,14 @@ dotnet build
 dotnet run
 
 cd C:\projetos\finance_dev\HomeOS\src\HomeOS.Client
-
 npm run dev
 
 cd C:\projetos\finance_dev\HomeOS\src\HomeOS.Mobile
 npx expo start --android -c
 npx expo start --android -c
+
+
+docker
+
+docker-compose build client --no-cache
+docker-compose up -d

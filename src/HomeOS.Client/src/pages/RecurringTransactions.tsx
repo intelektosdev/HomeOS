@@ -82,6 +82,22 @@ export function RecurringTransactions() {
         loadData();
     };
 
+    const handleGenerateManually = async () => {
+        if (!confirm('Deseja gerar as transações recorrentes manualmente?\n\nIsso criará transações para os próximos 30 dias.')) return;
+
+        setLoading(true);
+        try {
+            const result = await RecurringTransactionsService.generateAll(30);
+            alert(`✓ ${result.generatedCount} transação(ões) gerada(s) com sucesso!`);
+            // Optionally reload data to refresh display
+        } catch (error) {
+            console.error('Failed to generate transactions', error);
+            alert('Erro ao gerar transações. Verifique o console para mais detalhes.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const getFrequencyLabel = (freq: RecurrenceFrequency): string => {
         const labels: Record<RecurrenceFrequency, string> = {
             'Daily': 'Diária',
@@ -159,9 +175,19 @@ export function RecurringTransactions() {
                     <h1 className="page-title">Transações Recorrentes</h1>
                     <p className="page-description">Automação de receitas e despesas periódicas</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-                    + Nova Recorrência
-                </button>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button
+                        className="btn btn-secondary"
+                        onClick={handleGenerateManually}
+                        disabled={loading}
+                        title="Gerar transações para os próximos 30 dias"
+                    >
+                        {loading ? '⏳ Gerando...' : '🔄 Gerar Transações'}
+                    </button>
+                    <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+                        + Nova Recorrência
+                    </button>
+                </div>
             </header>
 
             <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>

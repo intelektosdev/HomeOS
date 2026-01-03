@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { CreditCardsService, AccountsService } from '../services/api';
-import type { CreditCardBalanceResponse, PendingTransaction, AccountResponse } from '../types';
+import { CreditCardsService, AccountsService, CategoriesService } from '../services/api';
+import type { CreditCardBalanceResponse, PendingTransaction, AccountResponse, CategoryResponse } from '../types';
 
 interface CreditCardDetailsProps {
     cardId: string;
@@ -11,13 +11,15 @@ interface CreditCardDetailsProps {
 export function CreditCardDetails({ cardId, onClose, onPaymentSuccess }: CreditCardDetailsProps) {
     const [balance, setBalance] = useState<CreditCardBalanceResponse | null>(null);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState<'details' | 'statement' | 'payment'>('details');
+    const [view, setView] = useState<'details' | 'statement' | 'history' | 'payment'>('details');
 
     // Payment & Statement State
     const [pendingTransactions, setPendingTransactions] = useState<PendingTransaction[]>([]);
     const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
     const [accounts, setAccounts] = useState<AccountResponse[]>([]);
     const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+    const [categories, setCategories] = useState<CategoryResponse[]>([]);
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
     const [referenceMonth, setReferenceMonth] = useState<string>(
         new Date().toISOString().slice(0, 7).replace('-', '') // YYYYMM
     );
@@ -54,12 +56,17 @@ export function CreditCardDetails({ cardId, onClose, onPaymentSuccess }: CreditC
         setLoading(true);
         try {
             // Ensure transactions are up to date
-            const [transactionsData, accountsData] = await Promise.all([
+            const [transactionsData, accountsData, categoriesData] = await Promise.all([
                 CreditCardsService.getPendingTransactions(cardId),
-                AccountsService.getAll()
+                AccountsService.getAll(),
+                CategoriesService.getAll()
             ]);
             setPendingTransactions(transactionsData);
             setAccounts(accountsData);
+
+            // Filter to show only Expense categories
+            const expenseCategories = categoriesData.filter(c => c.type === 'Expense');
+            setCategories(expenseCategories);
 
             const allIds = new Set(transactionsData.map(t => t.id));
             setSelectedTransactions(allIds);
@@ -67,6 +74,15 @@ export function CreditCardDetails({ cardId, onClose, onPaymentSuccess }: CreditC
             if (accountsData.length > 0) {
                 const defaultAccount = accountsData.find(a => a.type === 'Checking') || accountsData[0];
                 setSelectedAccountId(defaultAccount.id);
+            }
+
+            if (expenseCategories.length > 0) {
+                // Try to find a "Pagamento" or "Cartão" category, or use first transaction's category
+                const firstTxCategory = transactionsData.find(t => allIds.has(t.id))?.categoryId;
+                const defaultCat = expenseCategories.find(c => c.name.toLowerCase().includes('pagamento') || c.name.toLowerCase().includes('fatura'))
+                    || (firstTxCategory && expenseCategories.find(c => c.id === firstTxCategory))
+                    || expenseCategories[0];
+                setSelectedCategoryId(defaultCat.id);
             }
 
             setView('payment');
@@ -99,15 +115,23 @@ export function CreditCardDetails({ cardId, onClose, onPaymentSuccess }: CreditC
 
         setProcessingPayment(true);
         try {
+            const totalAmount = getTotalSelected();
+            const paymentDate = new Date().toISOString();
+
             await CreditCardsService.payBill(cardId, {
                 accountId: selectedAccountId,
-                referenceMonth: parseInt(referenceMonth),
+                referenceMonth: referenceMonth, // already YYYYMM string
+                amount: totalAmount,
+                paymentDate: paymentDate,
+                categoryId: selectedCategoryId,
                 transactionIds: Array.from(selectedTransactions)
             });
             onPaymentSuccess();
             onClose();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Payment failed', error);
+            const serverError = error.response?.data?.error;
+            alert(serverError ? `Falha: ${serverError}` : 'Falha ao processar o pagamento. Verifique os dados e tente novamente.');
         } finally {
             setProcessingPayment(false);
         }
@@ -140,24 +164,29 @@ export function CreditCardDetails({ cardId, onClose, onPaymentSuccess }: CreditC
                 </div>
 
                 {/* Navigation Tabs */}
-                {view !== 'payment' && (
-                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                        <button
-                            className={`btn ${view === 'details' ? 'btn-primary' : 'btn-text'}`}
-                            onClick={() => setView('details')}
-                            style={{ borderRadius: '0', borderBottom: view === 'details' ? '2px solid var(--primary-color)' : 'none' }}
-                        >
-                            Resumo
-                        </button>
-                        <button
-                            className={`btn ${view === 'statement' ? 'btn-primary' : 'btn-text'}`}
-                            onClick={() => setView('statement')}
-                            style={{ borderRadius: '0', borderBottom: view === 'statement' ? '2px solid var(--primary-color)' : 'none' }}
-                        >
-                            Extrato (Futuro)
-                        </button>
-                    </div>
-                )}
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                    <button
+                        className={`btn ${view === 'details' ? 'btn-primary' : 'btn-text'}`}
+                        onClick={() => setView('details')}
+                        style={{ borderRadius: '0', borderBottom: view === 'details' ? '2px solid var(--primary-color)' : 'none' }}
+                    >
+                        Resumo
+                    </button>
+                    <button
+                        className={`btn ${view === 'statement' ? 'btn-primary' : 'btn-text'}`}
+                        onClick={() => setView('statement')}
+                        style={{ borderRadius: '0', borderBottom: view === 'statement' ? '2px solid var(--primary-color)' : 'none' }}
+                    >
+                        Extrato (Futuro)
+                    </button>
+                    <button
+                        className={`btn ${view === 'history' ? 'btn-primary' : 'btn-text'}`}
+                        onClick={() => setView('history')}
+                        style={{ borderRadius: '0', borderBottom: view === 'history' ? '2px solid var(--primary-color)' : 'none' }}
+                    >
+                        Histórico de Pagamentos
+                    </button>
+                </div>
 
                 {view === 'details' && (
                     <div className="details-view">
@@ -246,6 +275,10 @@ export function CreditCardDetails({ cardId, onClose, onPaymentSuccess }: CreditC
                     </div>
                 )}
 
+                {view === 'history' && (
+                    <PaymentHistoryView cardId={cardId} />
+                )}
+
                 {view === 'payment' && (
                     <div className="payment-view">
                         <div className="form-group" style={{ marginBottom: '1.5rem' }}>
@@ -292,6 +325,20 @@ export function CreditCardDetails({ cardId, onClose, onPaymentSuccess }: CreditC
                                 <option value="" disabled>Selecione uma conta</option>
                                 {accounts.map(acc => (
                                     <option key={acc.id} value={acc.id}>{acc.name} ({acc.type})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                            <label className="form-label">Categoria do Pagamento</label>
+                            <select
+                                className="form-select"
+                                value={selectedCategoryId}
+                                onChange={(e) => setSelectedCategoryId(e.target.value)}
+                            >
+                                <option value="" disabled>Selecione uma categoria</option>
+                                {categories.map(cat => (
+                                    <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
                                 ))}
                             </select>
                         </div>
@@ -355,6 +402,53 @@ export function CreditCardDetails({ cardId, onClose, onPaymentSuccess }: CreditC
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+function PaymentHistoryView({ cardId }: { cardId: string }) {
+    const [payments, setPayments] = useState<import('../types').CreditCardPaymentResponse[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        CreditCardsService.getPayments(cardId)
+            .then(setPayments)
+            .catch(console.error)
+            .finally(() => setLoading(false));
+    }, [cardId]);
+
+    if (loading) return <div className="loading">Carregando histórico...</div>;
+
+    if (payments.length === 0) {
+        return <p className="empty-state">Nenhum pagamento registrado.</p>;
+    }
+
+    return (
+        <div className="payment-history-list">
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'left' }}>
+                        <th style={{ padding: '0.75rem' }}>Data</th>
+                        <th style={{ padding: '0.75rem' }}>Mês Ref.</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'right' }}>Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {payments.map(payment => (
+                        <tr key={payment.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <td style={{ padding: '0.75rem' }}>
+                                {new Date(payment.paymentDate).toLocaleDateString()}
+                            </td>
+                            <td style={{ padding: '0.75rem' }}>
+                                {payment.referenceMonth.toString().substring(4, 6)}/{payment.referenceMonth.toString().substring(0, 4)}
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
+                                R$ {payment.amount.toFixed(2)}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
         </div>
     );
 }

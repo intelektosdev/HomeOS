@@ -22,6 +22,7 @@ builder.Services.AddScoped<ShoppingListRepository>();
 builder.Services.AddScoped<PurchaseItemRepository>();
 builder.Services.AddScoped<CreditCardPaymentRepository>();
 builder.Services.AddScoped<RecurringTransactionRepository>();
+builder.Services.AddScoped<CreditCardTransactionRepository>();
 
 // Debt and Investment Repositories
 builder.Services.AddScoped<DebtRepository>();

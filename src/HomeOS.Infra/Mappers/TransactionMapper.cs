@@ -35,6 +35,8 @@ public static class TransactionMapper
         }
         else if (domain.Source.IsFromCreditCard)
         {
+            // Should not happen for standard Transactions anymore, but keeping for safety/compilation
+            // or we could throw exception if strictly enforced
             var source = (TransactionSource.FromCreditCard)domain.Source;
             dbModel.AccountId = null;
             dbModel.CreditCardId = source.creditCardId;
@@ -61,17 +63,12 @@ public static class TransactionMapper
                 break;
         }
 
-        // Mapping BillPaymentId (F# Option -> Nullable)
-        if (FSharpOption<Guid>.get_IsSome(domain.BillPaymentId))
-        {
-            dbModel.BillPaymentId = domain.BillPaymentId.Value;
-        }
-
-        // Mapping Installment Fields
-        if (FSharpOption<Guid>.get_IsSome(domain.InstallmentId)) dbModel.InstallmentId = domain.InstallmentId.Value;
-        if (FSharpOption<int>.get_IsSome(domain.InstallmentNumber)) dbModel.InstallmentNumber = domain.InstallmentNumber.Value;
-        if (FSharpOption<int>.get_IsSome(domain.TotalInstallments)) dbModel.TotalInstallments = domain.TotalInstallments.Value;
-
+        // BillPaymentId, InstallmentId, etc. are removed from Transaction domain for new flow
+        // but if they still exist in DbModel, we leave them null
+        
+        // ProductId mapping
+        dbModel.ProductId = FSharpOption<Guid>.get_IsSome(domain.ProductId) ? domain.ProductId.Value : (Guid?)null;
+        
         return dbModel;
     }
 
@@ -97,25 +94,11 @@ public static class TransactionMapper
         {
             source = TransactionSource.NewFromAccount(db.AccountId.Value);
         }
-        else if (db.CreditCardId.HasValue)
-        {
-            source = TransactionSource.NewFromCreditCard(db.CreditCardId.Value);
-        }
         else
         {
-            // Fallback temporário ou erro: Assumindo conta padrão se banco estiver inconsistente
-            // Idealmente lançaria exceção se o banco garante INTEGRIDADE
+            // Fallback for old data or errors
             source = TransactionSource.NewFromAccount(Guid.Empty);
         }
-
-        // Mapping BillPaymentId (Nullable -> F# Option)
-        var billPaymentId = db.BillPaymentId.HasValue
-            ? FSharpOption<Guid>.Some(db.BillPaymentId.Value)
-            : FSharpOption<Guid>.None;
-
-        var installmentId = db.InstallmentId.HasValue ? FSharpOption<Guid>.Some(db.InstallmentId.Value) : FSharpOption<Guid>.None;
-        var installmentNumber = db.InstallmentNumber.HasValue ? FSharpOption<int>.Some(db.InstallmentNumber.Value) : FSharpOption<int>.None;
-        var totalInstallments = db.TotalInstallments.HasValue ? FSharpOption<int>.Some(db.TotalInstallments.Value) : FSharpOption<int>.None;
 
         return new Transaction(
             db.Id,
@@ -127,10 +110,8 @@ public static class TransactionMapper
             db.CreatedAt,
             db.CategoryId,
             source,
-            billPaymentId,
-            installmentId,
-            installmentNumber,
-            totalInstallments
+            db.ProductId.HasValue ? FSharpOption<Guid>.Some(db.ProductId.Value) : FSharpOption<Guid>.None
+            // Removed fields
         );
 
     }

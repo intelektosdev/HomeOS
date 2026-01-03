@@ -3,7 +3,8 @@ import {
     AccountsService,
     CategoriesService,
     CreditCardsService,
-    TransactionsService
+    TransactionsService,
+    CreditCardTransactionsService
 } from '../services/api';
 import type {
     AccountResponse,
@@ -134,18 +135,38 @@ export function TransactionForm({ transaction, onSuccess, onCancel }: Transactio
         // Apply interest if applicable
         const finalAmount = getFinalAmount();
 
-        const requestData: CreateTransactionRequest = {
-            ...formData as CreateTransactionRequest,
-            amount: finalAmount, // Send total amount with interest
-            accountId: formData.accountId || undefined,
-            creditCardId: formData.creditCardId || undefined
-        };
-
         try {
-            if (transaction) {
-                await TransactionsService.update(transaction.id, requestData);
+            if (isCreditCard && formData.creditCardId) {
+                // Credit Card Transaction Logic
+                if (transaction) {
+                    // Update is tricky if changing type. For now assuming update works on same service or blocks type change.
+                    // Ideally we should have CreditCardTransactionsService.update
+                    setError('Edição de transação de cartão de crédito não implementada completamente neste refactor.');
+                    return;
+                }
+
+                await CreditCardTransactionsService.create({
+                    creditCardId: formData.creditCardId,
+                    categoryId: formData.categoryId,
+                    description: formData.description,
+                    amount: finalAmount,
+                    transactionDate: formData.dueDate, // Date of purchase
+                    installments: isInstallment ? (formData.installmentCount || 2) : 1
+                });
             } else {
-                await TransactionsService.create(requestData);
+                // Bank Account Transaction Logic
+                const requestData: CreateTransactionRequest = {
+                    ...formData as CreateTransactionRequest,
+                    amount: finalAmount,
+                    accountId: formData.accountId, // Only sending accountId
+                    creditCardId: undefined // Ensure this is not sent
+                };
+
+                if (transaction) {
+                    await TransactionsService.update(transaction.id, requestData);
+                } else {
+                    await TransactionsService.create(requestData);
+                }
             }
             onSuccess();
         } catch (err: any) {

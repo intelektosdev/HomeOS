@@ -32,114 +32,57 @@ public class TransactionController(
 
 
     // 1. POST: Create Expense (supports installments via Credit Card)
+    // 1. POST: Create Expense (Account Only)
     [HttpPost]
     public IActionResult CreateExpense([FromBody] CreateTransactionRequest request)
     {
         var userId = GetCurrentUserId();
 
-        if ((request.AccountId.HasValue && request.CreditCardId.HasValue) ||
-            (!request.AccountId.HasValue && !request.CreditCardId.HasValue))
+        if (request.CreditCardId.HasValue)
         {
-            return BadRequest(new { error = "You must provide either AccountId OR CreditCardId, but not both." });
+            return BadRequest(new { error = "This endpoint is for Account transactions only. Use /api/credit-cards/transactions for Credit Cards." });
+        }
+        
+        if (!request.AccountId.HasValue)
+        {
+             return BadRequest(new { error = "AccountId is required." });
         }
 
-        TransactionSource source;
-        if (request.AccountId.HasValue)
-        {
-            source = TransactionSource.NewFromAccount(request.AccountId.Value);
-        }
-        else
-        {
-            source = TransactionSource.NewFromCreditCard(request.CreditCardId!.Value);
-        }
+        TransactionSource source = TransactionSource.NewFromAccount(request.AccountId.Value);
 
-        var installments = request.InstallmentCount ?? 1;
-
-        // Fetch category to determine transaction type
+        // Fetch category
         var category = _categoryRepository.GetById(request.CategoryId, userId);
         if (category == null)
         {
             return BadRequest(new { error = "Category not found" });
         }
 
-        if (installments > 1)
+        var result = TransactionModule.createExpense(
+            request.Description,
+            request.Amount,
+            request.DueDate,
+            request.CategoryId,
+            source
+        );
+
+        if (result.IsError) return BadRequest(new { error = result.ErrorValue.ToString() });
+
+        var transaction = result.ResultValue;
+
+        // Set correct type based on category
+        if (category.Type == TransactionType.Income)
         {
-            if (!request.CreditCardId.HasValue)
-            {
-                return BadRequest(new { error = "Installments are only allowed for Credit Card transactions." });
-            }
-
-            decimal totalAmount = request.Amount;
-            decimal installmentValue = Math.Floor(totalAmount / installments * 100) / 100;
-            decimal remainder = totalAmount - (installmentValue * installments);
-
-            var installmentId = Guid.NewGuid();
-            var createdTransactions = new List<Transaction>();
-
-            for (int i = 0; i < installments; i++)
-            {
-                decimal currentAmount = installmentValue + (i == 0 ? remainder : 0);
-                DateTime currentDueDate = request.DueDate.AddMonths(i);
-
-                var result = TransactionModule.createExpense(
-                    request.Description,
-                    currentAmount,
-                    currentDueDate,
-                    request.CategoryId,
-                    source
-                );
-
-                if (result.IsError) return BadRequest(new { error = result.ErrorValue.ToString() });
-
-                var t = result.ResultValue;
-
-                // Set correct type based on category
-                if (category.Type == TransactionType.Income)
-                {
-                    t = new Transaction(
-                        t.Id, t.Description, TransactionType.Income, t.Status,
-                        t.Amount, t.DueDate, t.CreatedAt, t.CategoryId, t.Source,
-                        t.BillPaymentId, t.InstallmentId, t.InstallmentNumber, t.TotalInstallments
-                    );
-                }
-
-                // Add installment details
-                t = TransactionModule.addInstallmentDetails(t, installmentId, i + 1, installments);
-
-                _repository.Save(t, userId);
-                createdTransactions.Add(t);
-            }
-
-            return CreatedAtAction(nameof(GetById), new { id = createdTransactions[0].Id }, MapToResponse(createdTransactions[0]));
+             // Re-create as Income if category dictates (though method says CreateExpense...)
+             // Ideally we should have CreateIncome endpoint or generic Create
+             transaction = new Transaction(
+                transaction.Id, transaction.Description, TransactionType.Income, transaction.Status,
+                transaction.Amount, transaction.DueDate, transaction.CreatedAt, transaction.CategoryId, transaction.Source, transaction.ProductId
+             );
         }
-        else
-        {
-            var result = TransactionModule.createExpense(
-                request.Description,
-                request.Amount,
-                request.DueDate,
-                request.CategoryId,
-                source
-            );
 
-            if (result.IsError) return BadRequest(new { error = result.ErrorValue.ToString() });
+        _repository.Save(transaction, userId);
 
-            var transaction = result.ResultValue;
-
-            // Set correct type based on category
-            if (category.Type == TransactionType.Income)
-            {
-                transaction = new Transaction(
-                    transaction.Id, transaction.Description, TransactionType.Income, transaction.Status,
-                    transaction.Amount, transaction.DueDate, transaction.CreatedAt, transaction.CategoryId, transaction.Source,
-                    transaction.BillPaymentId, transaction.InstallmentId, transaction.InstallmentNumber, transaction.TotalInstallments
-                );
-            }
-
-            _repository.Save(transaction, userId);
-
-            return CreatedAtAction(nameof(GetById), new { id = transaction.Id }, MapToResponse(transaction));
-        }
+        return CreatedAtAction(nameof(GetById), new { id = transaction.Id }, MapToResponse(transaction));
     }
 
     // 2. GET (Extrato)
@@ -319,12 +262,15 @@ public class TransactionController(
             t.DueDate,
             t.CategoryId,
             t.Source.IsFromAccount ? ((TransactionSource.FromAccount)t.Source).accountId : (Guid?)null,
-            t.Source.IsFromCreditCard ? ((TransactionSource.FromCreditCard)t.Source).creditCardId : (Guid?)null,
-
-            // Installment Mapping
-            Microsoft.FSharp.Core.FSharpOption<Guid>.get_IsSome(t.InstallmentId) ? t.InstallmentId.Value : (Guid?)null,
-            Microsoft.FSharp.Core.FSharpOption<int>.get_IsSome(t.InstallmentNumber) ? t.InstallmentNumber.Value : (int?)null,
-            Microsoft.FSharp.Core.FSharpOption<int>.get_IsSome(t.TotalInstallments) ? t.TotalInstallments.Value : (int?)null
+            null, // CreditCardId removed from Transaction Response for Account view, or kept null
+            
+            // Installment Mapping - REMOVED
+            (Guid?)null,
+            (int?)null,
+            (int?)null,
+            
+            // ProductId
+            Microsoft.FSharp.Core.FSharpOption<Guid>.get_IsSome(t.ProductId) ? t.ProductId.Value : (Guid?)null
         );
     }
 

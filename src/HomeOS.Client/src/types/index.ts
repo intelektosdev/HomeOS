@@ -72,7 +72,10 @@ export interface PendingTransaction {
 
 export interface PayBillRequest {
     accountId: string;
-    referenceMonth: number;
+    referenceMonth: string; // YYYYMM format
+    amount: number;
+    paymentDate: string; // ISO format
+    categoryId?: string;
     transactionIds: string[];
 }
 
@@ -80,6 +83,13 @@ export interface PayBillResponse {
     billPaymentId: string;
     amount: number;
     transactionsCount: number;
+}
+
+export interface CreditCardPaymentResponse {
+    id: string;
+    amount: number;
+    paymentDate: string;
+    referenceMonth: number;
 }
 
 // --- TRANSACTIONS ---
@@ -92,6 +102,31 @@ export interface CreateTransactionRequest {
     accountId?: string;
     creditCardId?: string;
     installmentCount?: number;
+    productId?: string;
+}
+
+export interface CreateCreditCardTransactionRequest {
+    creditCardId: string;
+    categoryId: string;
+    description: string;
+    amount: number;
+    transactionDate: string;
+    installments?: number;
+    productId?: string;
+}
+
+export interface CreditCardTransactionResponse {
+    id: string;
+    description: string;
+    amount: number;
+    transactionDate: string;
+    categoryId: string;
+    status: string;
+    installmentId?: string;
+    installmentNumber?: number;
+    totalInstallments?: number;
+    billPaymentId?: string;
+    productId?: string;
 }
 
 export interface UpdateTransactionRequest extends CreateTransactionRequest { }
@@ -120,6 +155,7 @@ export interface TransactionResponse {
     installmentId?: string;
     installmentNumber?: number;
     totalInstallments?: number;
+    productId?: string;
 }
 
 // --- ANALYTICS ---

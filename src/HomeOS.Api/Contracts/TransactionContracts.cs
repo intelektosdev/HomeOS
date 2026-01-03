@@ -11,7 +11,9 @@ public record CreateTransactionRequest(
     Guid? AccountId,
     Guid? CreditCardId,
     // Installment fields
-    int? InstallmentCount // 1 or null = single transaction
+    int? InstallmentCount, // 1 or null = single transaction
+    // Product tracking
+    Guid? ProductId
 );
 
 public record UpdateTransactionRequest(
@@ -20,7 +22,8 @@ public record UpdateTransactionRequest(
     DateTime DueDate,
     [Required] Guid CategoryId,
     Guid? AccountId,
-    Guid? CreditCardId
+    Guid? CreditCardId,
+    Guid? ProductId
 );
 
 public record CancelTransactionRequest(
@@ -43,5 +46,6 @@ public record TransactionResponse(
     Guid? CreditCardId,
     Guid? InstallmentId,
     int? InstallmentNumber,
-    int? TotalInstallments
+    int? TotalInstallments,
+    Guid? ProductId
 );

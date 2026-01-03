@@ -19,7 +19,9 @@ import type {
     DebtStatistics,
     PortfolioSummary,
     CashFlowForecastResponse,
-    AnalyticsSummaryResponse
+    AnalyticsSummaryResponse,
+    CreateCreditCardTransactionRequest,
+    CreditCardTransactionResponse
 } from '../types';
 
 export const api = axios.create({
@@ -115,6 +117,10 @@ export const CreditCardsService = {
     payBill: async (id: string, data: PayBillRequest) => {
         const response = await api.post<PayBillResponse>(`/credit-cards/${id}/pay-bill`, data);
         return response.data;
+    },
+    getPayments: async (id: string) => {
+        const response = await api.get<import('../types').CreditCardPaymentResponse[]>(`/credit-cards/${id}/payments`);
+        return response.data;
     }
 };
 
@@ -151,6 +157,21 @@ export const TransactionsService = {
     },
     delete: async (id: string) => {
         await api.delete(`/transactions/${id}`);
+    }
+};
+
+export const CreditCardTransactionsService = {
+    create: async (data: CreateCreditCardTransactionRequest) => {
+        const response = await api.post<CreditCardTransactionResponse>('/credit-cards/transactions', data);
+        return response.data;
+    },
+    getById: async (id: string) => {
+        const response = await api.get<CreditCardTransactionResponse>(`/credit-cards/transactions/${id}`);
+        return response.data;
+    },
+    getOpenByCard: async (cardId: string) => {
+        const response = await api.get<CreditCardTransactionResponse[]>(`/credit-cards/transactions/card/${cardId}/open`);
+        return response.data;
     }
 };
 

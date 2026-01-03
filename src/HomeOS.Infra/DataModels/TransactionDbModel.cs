@@ -24,4 +24,7 @@ public class TransactionDbModel
     public byte StatusId { get; set; }
     public DateTime? PaymentDate { get; set; }
     public string? CancellationReason { get; set; }
+    
+    // Product tracking
+    public Guid? ProductId { get; set; }
 }

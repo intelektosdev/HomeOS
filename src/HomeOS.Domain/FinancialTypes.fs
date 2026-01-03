@@ -67,10 +67,34 @@ type Transaction =
       CreatedAt: DateTime
       CategoryId: Guid
       Source: TransactionSource
-      BillPaymentId: Guid option
+      ProductId: Guid option
+    // BillPaymentId removed - it belongs to CreditCardTransaction now
+    // InstallmentId removed - it belongs to CreditCardTransaction now
+    // InstallmentNumber removed - it belongs to CreditCardTransaction now
+    // TotalInstallments removed - it belongs to CreditCardTransaction now
+    }
+
+// New Entity for Credit Card Transactions
+type CreditCardTransactionStatus =
+    | Open
+    | Invoiced // Fechado na fatura, aguardando pagamento
+    | Paid // Fatura paga
+
+type CreditCardTransaction =
+    { Id: Guid
+      CreditCardId: Guid
+      UserId: Guid
+      CategoryId: Guid
+      Description: string
+      Amount: Money
+      TransactionDate: DateTime
+      CreatedAt: DateTime
+      Status: CreditCardTransactionStatus
       InstallmentId: Guid option
       InstallmentNumber: int option
-      TotalInstallments: int option }
+      TotalInstallments: int option
+      BillPaymentId: Guid option
+      ProductId: Guid option }
 
 // --- COMPORTAMENTOS (MODULES) ---
 
@@ -176,10 +200,7 @@ module TransactionModule =
                   CreatedAt = DateTime.Now
                   CategoryId = categoryId
                   Source = source
-                  BillPaymentId = None
-                  InstallmentId = None
-                  InstallmentNumber = None
-                  TotalInstallments = None }
+                  ProductId = None }
 
     // Factory: Criação de uma nova receita
     let createIncome
@@ -202,10 +223,7 @@ module TransactionModule =
                   CreatedAt = DateTime.Now
                   CategoryId = categoryId
                   Source = source
-                  BillPaymentId = None
-                  InstallmentId = None
-                  InstallmentNumber = None
-                  TotalInstallments = None }
+                  ProductId = None }
 
 
     // Função Pura: Recebe transação atual -> Retorna nova transação ou Erro
@@ -216,29 +234,27 @@ module TransactionModule =
         else
             // Pattern Matching no Status atual
             match transaction.Status with
-            | Pending ->
+            | TransactionStatus.Pending ->
                 // sucesso: Retornacopia atualizada (Imutabilidade)
                 Ok
                     { transaction with
-                        Status = Paid paymentDate }
-            | Paid _
-            | Conciliated _ -> Error TransactionAlreadyPaid
-            | Cancelled _ -> Error TransactionIsCancelled
+                        Status = TransactionStatus.Paid paymentDate }
+            | TransactionStatus.Paid _
+            | TransactionStatus.Conciliated _ -> Error TransactionAlreadyPaid
+            | TransactionStatus.Cancelled _ -> Error TransactionIsCancelled
 
-    let addInstallmentDetails (transaction: Transaction) (id: Guid) (number: int) (total: int) : Transaction =
-        { transaction with
-            InstallmentId = Some id
-            InstallmentNumber = Some number
-            TotalInstallments = Some total }
+    // addInstallmentDetails removed - Transactions no longer support installments directly (handled by CreditCardTransaction)
+    // let addInstallmentDetails (transaction: Transaction) (id: Guid) (number: int) (total: int) : Transaction = ...
+
 
     let cancel (transaction: Transaction) (reason: string) : Result<Transaction, DomainError> =
         match transaction.Status with
-        | Conciliated _ -> Error TransactionIsCancelled
-        | Cancelled _ -> Error TransactionIsCancelled
+        | TransactionStatus.Conciliated _ -> Error TransactionIsCancelled
+        | TransactionStatus.Cancelled _ -> Error TransactionIsCancelled
         | _ ->
             Ok
                 { transaction with
-                    Status = Cancelled reason }
+                    Status = TransactionStatus.Cancelled reason }
 
     let update
         (transaction: Transaction)
@@ -253,7 +269,7 @@ module TransactionModule =
             Error AmountMustBePositive
         else
             match transaction.Status with
-            | Cancelled _ -> Error TransactionIsCancelled
+            | TransactionStatus.Cancelled _ -> Error TransactionIsCancelled
             | _ ->
                 Ok
                     { transaction with
@@ -268,8 +284,8 @@ module TransactionModule =
             Error PaymentDateCannotBeInFuture
         else
             match transaction.Status with
-            | Cancelled _ -> Error TransactionIsCancelled
+            | TransactionStatus.Cancelled _ -> Error TransactionIsCancelled
             | _ ->
                 Ok
                     { transaction with
-                        Status = Conciliated conciliatedAt }
+                        Status = TransactionStatus.Conciliated conciliatedAt }

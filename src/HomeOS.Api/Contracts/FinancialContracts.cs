@@ -70,7 +70,10 @@ public record CreditCardBalanceResponse(
 
 public record PayBillRequest(
     Guid AccountId,
-    int ReferenceMonth, // YYYYMM format
+    string ReferenceMonth, // YYYYMM format
+    decimal Amount,
+    DateTime PaymentDate,
+    Guid? CategoryId,
     Guid[] TransactionIds
 );
 

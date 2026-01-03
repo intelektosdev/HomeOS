@@ -45,8 +45,7 @@ public class InvestmentController : ControllerBase
             {
                 transaction = new Transaction(
                 transaction.Id, transaction.Description, TransactionType.Income, transaction.Status,
-                transaction.Amount, transaction.DueDate, transaction.CreatedAt, transaction.CategoryId, transaction.Source,
-                transaction.BillPaymentId, transaction.InstallmentId, transaction.InstallmentNumber, transaction.TotalInstallments
+                transaction.Amount, transaction.DueDate, transaction.CreatedAt, transaction.CategoryId, transaction.Source, transaction.ProductId
             );
             }
 

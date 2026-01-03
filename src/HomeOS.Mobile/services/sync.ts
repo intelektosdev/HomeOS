@@ -1,5 +1,6 @@
 import * as Network from 'expo-network';
 import { TransactionsService, CategoriesService, AccountsService, ShoppingListService, CreditCardsService } from './api';
+import { ProductGroupsService, ProductsService, api } from './api';
 import {
     getPendingTransactions,
     deletePendingTransaction,
@@ -134,15 +135,37 @@ export const syncPendingTransactions = async () => {
                 // Parse the JSON payload back to the request object
                 const transactionData: CreateTransactionRequest = JSON.parse(item.payload);
 
-                // Send to API
-                await TransactionsService.create(transactionData);
+                // Route to correct endpoint based on transaction type
+                if (transactionData.creditCardId) {
+                    // Credit card transactions go to /api/credit-cards/transactions
+                    // Transform to match CreateCreditCardTransactionRequest
+                    const creditCardPayload = {
+                        creditCardId: transactionData.creditCardId,
+                        categoryId: transactionData.categoryId,
+                        description: transactionData.description,
+                        amount: transactionData.amount,
+                        transactionDate: transactionData.dueDate, // Map dueDate to transactionDate
+                        installments: transactionData.installmentCount || null,
+                        productId: (transactionData as any).productId || null
+                    };
+                    await api.post('/credit-cards/transactions', creditCardPayload);
+                } else {
+                    // Account transactions go to /api/transactions
+                    await TransactionsService.create(transactionData);
+                }
 
                 // 4. If successful, delete from local DB
                 await deletePendingTransaction(item.id);
                 syncedCount++;
 
-            } catch (error) {
+            } catch (error: any) {
                 console.error(`Erro ao sincronizar transação ${item.id}:`, error);
+                if (error.response?.data) {
+                    console.error("Detalhes do erro da API:", JSON.stringify(error.response.data));
+                }
+                if (error.response?.status) {
+                    console.error("Status HTTP:", error.response.status);
+                }
             }
         }
 
@@ -229,6 +252,7 @@ const processInventoryQueue = async () => {
 
     // Map to track temporary local IDs -> Real Server IDs
     const idMap = new Map<string, string>();
+    const failedTempIds = new Set<string>();
 
     // Helper to replace IDs in pending items permanently in SQLite
     const updatePendingItemsWithServerId = async (tempId: string, serverId: string) => {
@@ -251,30 +275,49 @@ const processInventoryQueue = async () => {
     };
 
     for (const item of queue) {
+        let payload: any;
         try {
             // Re-fetch payload to ensure freshness
             const currentItem = (await getPendingInventoryUpdates()).find(i => i.id === item.id);
             if (!currentItem) continue;
 
-            const payload = JSON.parse(currentItem.payload);
+            payload = JSON.parse(currentItem.payload);
 
             // Apply in-memory map locally too
             if (payload.id && idMap.has(payload.id)) payload.id = idMap.get(payload.id);
             if (payload.productGroupId && idMap.has(payload.productGroupId)) payload.productGroupId = idMap.get(payload.productGroupId);
+            if (payload.categoryId && idMap.has(payload.categoryId)) payload.categoryId = idMap.get(payload.categoryId);
+
+            // Skip if dependency failed
+            if (payload.id && failedTempIds.has(payload.id)) {
+                console.log(`Skipping ${item.type} for ${payload.id} because dependency creation failed.`);
+                continue;
+            }
 
             if (item.type === 'CREATE_PRODUCT') {
                 // Sanitize Payload: Remove tempId before sending to API to avoid 400 Bad Request
                 const { tempId, ...apiPayload } = payload;
 
-                const response = await ProductsService.create(apiPayload);
-                const serverId = response.id;
+                // Fix for unsupported unit 'pct' -> 'un', and ensure unit is present
+                if (!apiPayload.unit || apiPayload.unit === 'pct') apiPayload.unit = 'un';
 
-                if (tempId) {
-                    idMap.set(tempId, serverId);
-                    await updatePendingItemsWithServerId(tempId, serverId);
-                    console.log(`Mapped/Persisted Temp ID ${tempId} -> Server ID ${serverId}`);
+                // Ensure name is present (defensive)
+                if (!apiPayload.name) apiPayload.name = 'Produto Sem Nome (Recuperado)';
+
+                try {
+                    const response = await ProductsService.create(apiPayload);
+                    const serverId = response.id;
+
+                    if (tempId) {
+                        idMap.set(tempId, serverId);
+                        await updatePendingItemsWithServerId(tempId, serverId);
+                        console.log(`Mapped/Persisted Temp ID ${tempId} -> Server ID ${serverId}`);
+                    }
+                    await deletePendingInventoryUpdate(item.id);
+                } catch (e) {
+                    if (payload.tempId) failedTempIds.add(payload.tempId);
+                    throw e;
                 }
-                await deletePendingInventoryUpdate(item.id);
 
             } else if (item.type === 'UPDATE_PRODUCT') {
                 await ProductsService.update(payload.id, payload);
@@ -288,18 +331,33 @@ const processInventoryQueue = async () => {
                 const { ProductGroupsService } = await import('./api');
                 // Sanitize
                 const { tempId, ...apiPayload } = payload;
-                const response = await ProductGroupsService.create(apiPayload);
 
-                if (tempId) {
-                    idMap.set(tempId, response.id);
-                    await updatePendingItemsWithServerId(tempId, response.id);
-                    console.log(`Mapped/Persisted Group Temp ID ${tempId} -> Server ID ${response.id}`);
+                try {
+                    const response = await ProductGroupsService.create(apiPayload);
+
+                    if (tempId) {
+                        idMap.set(tempId, response.id);
+                        await updatePendingItemsWithServerId(tempId, response.id);
+                        console.log(`Mapped/Persisted Group Temp ID ${tempId} -> Server ID ${response.id}`);
+                    }
+                    await deletePendingInventoryUpdate(item.id);
+                } catch (e) {
+                    if (payload.tempId) failedTempIds.add(payload.tempId);
+                    throw e;
                 }
-                await deletePendingInventoryUpdate(item.id);
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error(`Falha ao processar item da fila ${item.id} (${item.type}):`, error);
+            if (error.response?.data) {
+                console.error("Detalhes do erro API:", typeof error.response.data === 'object' ? JSON.stringify(error.response.data) : error.response.data);
+            }
+
+            // Handle 404 - Resource not found (Orphaned item or stale ID)
+            if (error.response && error.response.status === 404) {
+                console.log(`Item ${item.id} returned 404. Removing from queue to unblock.`);
+                await deletePendingInventoryUpdate(item.id);
+            }
         }
     }
 };

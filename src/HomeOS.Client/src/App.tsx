@@ -18,6 +18,7 @@ import { Investments } from './pages/Investments';
 import { CashFlowForecast } from './pages/CashFlowForecast';
 import { Budgets } from './pages/Budgets';
 import { Goals } from './pages/Goals';
+import { SimpleExpenseEntry } from './pages/SimpleExpenseEntry';
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -98,6 +99,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Transactions />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/simple-expense"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <SimpleExpenseEntry />
                 </MainLayout>
               </ProtectedRoute>
             }

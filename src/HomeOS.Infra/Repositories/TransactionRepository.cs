@@ -105,48 +105,9 @@ public class TransactionRepository(IConfiguration configuration)
         return connection.Query(sql, new { StartDate = startDate, EndDate = endDate, UserId = userId, CategoryId = categoryId, AccountId = accountId });
     }
 
-    /// <summary>
-    /// Get transactions for a credit card that are not yet linked to a bill payment (pending for bill)
-    /// </summary>
-    public IEnumerable<dynamic> GetPendingByCard(Guid creditCardId, Guid userId)
-    {
-        const string sql = @"
-        SELECT 
-            Id, Description, Amount, DueDate, CategoryId, 
-            InstallmentNumber, TotalInstallments,
-            CASE 
-                WHEN StatusId = 1 THEN 'Pending'
-                WHEN StatusId = 2 THEN 'Paid'
-                WHEN StatusId = 3 THEN 'Conciliated'
-                WHEN StatusId = 4 THEN 'Cancelled'
-            END as Status
-        FROM [Finance].[Transactions]
-        WHERE CreditCardId = @CreditCardId 
-            AND UserId = @UserId 
-            AND BillPaymentId IS NULL
-            AND StatusId != 4  -- Not Cancelled
-        ORDER BY DueDate ASC";
+    // GetPendingByCard removed - migrated to CreditCardTransactionRepository
 
-        using var connection = new SqlConnection(_connectionString);
-        return connection.Query(sql, new { CreditCardId = creditCardId, UserId = userId });
-    }
-
-    /// <summary>
-    /// Calculate the used limit: sum of transactions linked to the card without BillPaymentId (not yet paid in bill)
-    /// </summary>
-    public decimal GetUsedLimitByCard(Guid creditCardId, Guid userId)
-    {
-        const string sql = @"
-        SELECT COALESCE(SUM(Amount), 0)
-        FROM [Finance].[Transactions]
-        WHERE CreditCardId = @CreditCardId 
-            AND UserId = @UserId 
-            AND BillPaymentId IS NULL
-            AND StatusId != 4";  // Not Cancelled
-
-        using var connection = new SqlConnection(_connectionString);
-        return connection.ExecuteScalar<decimal>(sql, new { CreditCardId = creditCardId, UserId = userId });
-    }
+    // GetUsedLimitByCard removed - migrated to CreditCardTransactionRepository (logic needs to be in Controller or new Repo method)
 
     /// <summary>
     /// Link transactions to a bill payment and mark them as Conciliated
@@ -236,6 +197,8 @@ public class TransactionRepository(IConfiguration configuration)
         return dbModel == null ? null : TransactionMapper.ToDomain(dbModel);
     }
 
+    // LinkToBillPayment removed - This responsibility is now handled by CreditCardTransactionRepository / linking
+    
     public void Delete(Guid id, Guid userId)
     {
         const string sql = "DELETE FROM [Finance].[Transactions] WHERE Id = @Id AND UserId = @UserId";

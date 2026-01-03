@@ -142,6 +142,15 @@ export function Sidebar() {
                         </button>
 
                         <div className={`nav-section-content ${openSections.financeiro ? 'open' : ''}`}>
+                            <NavLinkMobile to="/simple-expense" className="nav-item" style={{
+                                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15))',
+                                border: '1px solid rgba(99, 102, 241, 0.3)',
+                                fontWeight: 500
+                            }}>
+                                <span className="nav-icon">⚡</span>
+                                <span className="nav-label">Lançamento Rápido</span>
+                            </NavLinkMobile>
+
                             <NavLinkMobile to="/transactions" className="nav-item">
                                 <span className="nav-icon">💸</span>
                                 <span className="nav-label">Transações</span>

@@ -8,6 +8,10 @@ import { loadAuthToken } from '../services/api';
 
 let isDbInitialized = false;
 
+import { SyncLoading } from '../components/sync-loading';
+
+// ... (imports remain)
+
 export default function Layout() {
     const [isReady, setIsReady] = useState(false);
 
@@ -20,8 +24,8 @@ export default function Layout() {
                     // 2. Init DB
                     await initDatabase();
                     isDbInitialized = true;
-                    // 3. Sync
-                    tryAutoSync();
+                    // 3. Sync (Wait for it)
+                    await tryAutoSync();
                 } catch (e) {
                     console.error("Initialization Failed:", e);
                 }
@@ -33,11 +37,7 @@ export default function Layout() {
     }, []);
 
     if (!isReady) {
-        return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' }}>
-                <ActivityIndicator size="large" color="#3b82f6" />
-            </View>
-        );
+        return <SyncLoading onSkip={() => setIsReady(true)} />;
     }
 
     return (

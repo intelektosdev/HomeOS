@@ -22,6 +22,7 @@ export default function CardDetailsScreen() {
     // Payment Modal State
     const [paymentModalVisible, setPaymentModalVisible] = useState(false);
     const [selectedAccountId, setSelectedAccountId] = useState('');
+    const [selectedCategoryId, setSelectedCategoryId] = useState('');
     const [paying, setPaying] = useState(false);
 
     const loadData = async () => {
@@ -62,6 +63,13 @@ export default function CardDetailsScreen() {
             // Pre-select first active account
             const defaultAccount = accs.find(a => a.isActive) || accs[0];
             if (defaultAccount) setSelectedAccountId(defaultAccount.id);
+
+            // Pre-select a default category (e.g., first Expense category or one named "Pagamento")
+            const expenseCats = Object.values(catMap).filter(c => c.type === 'Expense');
+            if (expenseCats.length > 0) {
+                const defaultCat = expenseCats.find(c => c.name.toLowerCase().includes('pagamento') || c.name.toLowerCase().includes('fatura')) || expenseCats[0];
+                setSelectedCategoryId(defaultCat.id);
+            }
 
         } catch (error) {
             console.error('Error loading card details:', error);
@@ -109,49 +117,53 @@ export default function CardDetailsScreen() {
     };
 
     const processPayment = async () => {
-        if (!selectedAccountId || !balance || !card) {
+        if (!selectedAccountId || !balance || !card || !selectedCategoryId) {
             return;
         }
 
         try {
             setPaying(true);
 
+            // Using local time for payment date
             const now = new Date();
-            const referenceMonth = now.getMonth() + 1;
+            const paymentDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString();
+
+            // Format YYYYMM as string
+            const referenceMonth = format(now, "yyyyMM");
             const transactionIds = transactions.map(t => t.id);
 
             await CreditCardsService.payBill(id, {
                 accountId: selectedAccountId,
                 referenceMonth,
+                amount: balance.usedLimit,
+                paymentDate,
+                categoryId: selectedCategoryId,
                 transactionIds
             });
 
             setPaymentModalVisible(false);
 
-            // Phase 2: Better success feedback
             Alert.alert(
                 '✅ Pagamento Registrado!',
-                `O pagamento de R$ ${balance.usedLimit.toFixed(2)} foi registrado com sucesso. Os dados serão sincronizados em breve.`,
+                `O pagamento de R$ ${balance.usedLimit.toFixed(2)} foi registrado com sucesso.`,
                 [{ text: 'OK', onPress: () => loadData() }]
             );
 
         } catch (error: any) {
             console.error('Error paying bill:', error);
 
-            // Phase 2: Better error handling
             let errorMessage = 'Não foi possível registrar o pagamento. Tente novamente.';
 
-            if (error.response?.status === 400) {
+            // Show specific error from backend if available
+            if (error.response?.data?.error) {
+                errorMessage = error.response.data.error;
+            } else if (error.response?.status === 400) {
                 errorMessage = 'Dados inválidos. Verifique as informações e tente novamente.';
-            } else if (error.response?.status === 404) {
-                errorMessage = 'Cartão ou conta não encontrada. Sincronize os dados e tente novamente.';
             } else if (!await isConnected()) {
-                errorMessage = 'Sem conexão com a internet. O pagamento será processado quando você estiver online.';
+                errorMessage = 'Sem conexão com a internet.';
             }
 
-            Alert.alert('Erro no Pagamento', errorMessage, [
-                { text: 'OK' }
-            ]);
+            Alert.alert('Erro no Pagamento', errorMessage, [{ text: 'OK' }]);
         } finally {
             setPaying(false);
         }
@@ -373,10 +385,11 @@ export default function CardDetailsScreen() {
 
                         <Text className="text-xs font-bold text-gray-500 uppercase mb-2">Pagar com</Text>
 
-                        <ScrollView className="max-h-64 mb-6">
+                        <ScrollView className="max-h-96 mb-6">
+                            <Text className="text-xs font-bold text-gray-500 uppercase mb-2 mt-2">Conta de Pagamento</Text>
                             {accounts.length === 0 ? (
                                 <View className="bg-orange-50 p-4 rounded-xl border border-orange-200">
-                                    <Text className="text-center text-orange-700">Nenhuma conta disponível. Sincronize seus dados.</Text>
+                                    <Text className="text-center text-orange-700">Nenhuma conta disponível.</Text>
                                 </View>
                             ) : (
                                 accounts.map(acc => (
@@ -396,12 +409,30 @@ export default function CardDetailsScreen() {
                                     </TouchableOpacity>
                                 ))
                             )}
+
+                            <Text className="text-xs font-bold text-gray-500 uppercase mb-2 mt-4">Categoria do Lançamento</Text>
+                            {Object.values(categories).filter(c => c.type === 'Expense').map(cat => (
+                                <TouchableOpacity
+                                    key={cat.id}
+                                    onPress={() => setSelectedCategoryId(cat.id)}
+                                    className={`p-3 mb-2 rounded-xl border flex-row items-center ${selectedCategoryId === cat.id
+                                        ? 'border-green-500 bg-green-50'
+                                        : 'border-gray-100 bg-white'
+                                        }`}
+                                >
+                                    <View className="w-8 h-8 rounded-full bg-gray-100 justify-center items-center mr-3">
+                                        <Text>{cat.icon || '📁'}</Text>
+                                    </View>
+                                    <Text className="font-medium text-gray-700 flex-1">{cat.name}</Text>
+                                    {selectedCategoryId === cat.id && <Text className="text-green-600">✓</Text>}
+                                </TouchableOpacity>
+                            ))}
                         </ScrollView>
 
                         <TouchableOpacity
-                            className={`p-4 rounded-xl items-center shadow-lg mb-4 ${paying || !selectedAccountId ? 'bg-gray-400' : 'bg-green-600'}`}
+                            className={`p-4 rounded-xl items-center shadow-lg mb-4 ${paying || !selectedAccountId || !selectedCategoryId ? 'bg-gray-400' : 'bg-green-600'}`}
                             onPress={handlePayBill}
-                            disabled={paying || !selectedAccountId}
+                            disabled={paying || !selectedAccountId || !selectedCategoryId}
                         >
                             {paying ? (
                                 <ActivityIndicator color="white" />

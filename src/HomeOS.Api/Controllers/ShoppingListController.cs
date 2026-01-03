@@ -15,17 +15,20 @@ public class ShoppingListController : ControllerBase
     private readonly ProductRepository _productRepository;
     private readonly TransactionRepository _transactionRepository;
     private readonly PurchaseItemRepository _purchaseItemRepository;
+    private readonly CreditCardTransactionRepository _ccTransactionRepository;
 
     public ShoppingListController(
         ShoppingListRepository shoppingListRepository,
         ProductRepository productRepository,
         TransactionRepository transactionRepository,
-        PurchaseItemRepository purchaseItemRepository)
+        PurchaseItemRepository purchaseItemRepository,
+        CreditCardTransactionRepository ccTransactionRepository)
     {
         _shoppingListRepository = shoppingListRepository;
         _productRepository = productRepository;
         _transactionRepository = transactionRepository;
         _purchaseItemRepository = purchaseItemRepository;
+        _ccTransactionRepository = ccTransactionRepository;
     }
 
     // Fixed userId for local development without authentication
@@ -165,45 +168,53 @@ public class ShoppingListController : ControllerBase
             return BadRequest("Informe Conta ou Cartão de Crédito.");
         }
 
-        HomeOS.Domain.FinancialTypes.Transaction transactionToLink = null;
+        Guid? transactionIdToLink = null;
 
         // Handle Transaction Creation (Single or Installments)
-        if (installments > 1 && request.CreditCardId.HasValue)
+        if (request.CreditCardId.HasValue)
         {
+            // --- CREDIT CARD TRANSACTION FLOW ---
             decimal installmentValue = Math.Floor(total / installments * 100) / 100;
             decimal remainder = total - (installmentValue * installments);
-            var installmentId = Guid.NewGuid();
+            var installmentId = installments > 1 ? Microsoft.FSharp.Core.FSharpOption<Guid>.Some(Guid.NewGuid()) : Microsoft.FSharp.Core.FSharpOption<Guid>.None;
+            var totalInstallmentsOpt = installments > 1 ? Microsoft.FSharp.Core.FSharpOption<int>.Some(installments) : Microsoft.FSharp.Core.FSharpOption<int>.None;
 
             for (int i = 0; i < installments; i++)
             {
                 decimal currentAmount = installmentValue + (i == 0 ? remainder : 0);
                 DateTime currentDueDate = request.PurchaseDate.AddMonths(i);
+                var installmentDesc = installments > 1 ? $"{description} ({i + 1}/{installments})" : description;
 
-                var installmentDesc = $"{description} ({i + 1}/{installments})";
+                var installmentNumOpt = installments > 1 ? Microsoft.FSharp.Core.FSharpOption<int>.Some(i + 1) : Microsoft.FSharp.Core.FSharpOption<int>.None;
 
-                var result = HomeOS.Domain.FinancialTypes.TransactionModule.createExpense(
+                var ccTransaction = new HomeOS.Domain.FinancialTypes.CreditCardTransaction(
+                    Guid.NewGuid(),
+                    request.CreditCardId.Value,
+                    userId,
+                    request.CategoryId,
                     installmentDesc,
                     currentAmount,
-                    currentDueDate,
-                    request.CategoryId,
-                    source
+                    currentDueDate, // TransactionDate
+                    DateTime.Now,   // CreatedAt
+                    HomeOS.Domain.FinancialTypes.CreditCardTransactionStatus.Open,
+                    installmentId,
+                    installmentNumOpt,
+                    totalInstallmentsOpt,
+                    Microsoft.FSharp.Core.FSharpOption<Guid>.None, // BillPaymentId
+                    Microsoft.FSharp.Core.FSharpOption<Guid>.None  // ProductId
                 );
 
-                if (result.IsError) return BadRequest(result.ErrorValue.ToString());
-
-                var t = result.ResultValue;
-                // Add installment details
-                t = HomeOS.Domain.FinancialTypes.TransactionModule.addInstallmentDetails(t, installmentId, i + 1, installments);
-
-                _transactionRepository.Save(t, userId);
+                _ccTransactionRepository.Save(ccTransaction);
 
                 // Link relevant items to the FIRST transaction
-                if (i == 0) transactionToLink = t;
+                if (i == 0) transactionIdToLink = ccTransaction.Id;
             }
         }
         else
         {
-            // Single Transaction
+            // --- BANK ACCOUNT TRANSACTION FLOW ---
+            // Single Transaction (Installments not supported on Bank Account directly in this flow)
+            
             var transactionResult = HomeOS.Domain.FinancialTypes.TransactionModule.createExpense(
                description,
                total,
@@ -215,13 +226,14 @@ public class ShoppingListController : ControllerBase
             if (transactionResult.IsError)
                 return BadRequest(transactionResult.ErrorValue.ToString());
 
-            transactionToLink = transactionResult.ResultValue;
-            _transactionRepository.Save(transactionToLink, userId);
+            var transaction = transactionResult.ResultValue;
+            _transactionRepository.Save(transaction, userId);
+            transactionIdToLink = transaction.Id;
         }
 
 
         // Process items (Linked to the first transaction/single transaction)
-        if (transactionToLink != null)
+        if (transactionIdToLink.HasValue)
         {
             foreach (var checkoutItem in request.Items)
             {
@@ -266,7 +278,7 @@ public class ShoppingListController : ControllerBase
 
                 var purchaseItemResult = PurchaseItemModule.create(
                     productId.Value,
-                    transactionToLink.Id,
+                    transactionIdToLink.Value,
                     supplierId,
                     checkoutItem.Quantity,
                     checkoutItem.UnitPrice,
@@ -291,7 +303,7 @@ public class ShoppingListController : ControllerBase
 
         return Ok(new
         {
-            TransactionId = transactionToLink?.Id,
+            TransactionId = transactionIdToLink,
             Total = total,
             ItemCount = request.Items.Count
         });

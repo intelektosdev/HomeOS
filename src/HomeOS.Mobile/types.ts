@@ -72,7 +72,10 @@ export interface PendingTransaction {
 
 export interface PayBillRequest {
     accountId: string;
-    referenceMonth: number;
+    referenceMonth: string;
+    amount: number;
+    paymentDate: string;
+    categoryId: string;
     transactionIds: string[];
 }
 

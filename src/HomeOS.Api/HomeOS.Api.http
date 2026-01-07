@@ -1,4 +1,4 @@
-@HomeOS.Api_HostAddress = http://localhost:5050
+@HomeOS.Api_HostAddress = http://localhost:5055
 
 GET {{HomeOS.Api_HostAddress}}/weatherforecast/
 Accept: application/json

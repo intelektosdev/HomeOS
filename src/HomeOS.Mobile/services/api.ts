@@ -37,8 +37,8 @@ import type {
 // Android Emulator uses 10.0.2.2 to access host machine
 // iOS Simulator uses localhost
 const API_URL = Platform.OS === 'android'
-    ? 'http://192.168.15.13:5050/api'
-    : 'http://192.168.15.13:5050/api';
+    ? 'http://192.168.15.13:5055/api'
+    : 'http://192.168.15.13:5055/api';
 
 export const api = axios.create({
     baseURL: API_URL,

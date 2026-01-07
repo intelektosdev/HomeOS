@@ -25,7 +25,7 @@ WORKDIR /app
 COPY --from=build /app/publish .
 
 # Configure Kestrel to listen on all interfaces
-ENV ASPNETCORE_URLS=http://+:5050
-EXPOSE 5050
+ENV ASPNETCORE_URLS=http://+:5055
+EXPOSE 5055
 
 ENTRYPOINT ["dotnet", "HomeOS.Api.dll"]

@@ -25,7 +25,7 @@ services:
       dockerfile: Dockerfile.api
     container_name: homeos-api
     ports:
-      - "5050:5050"
+      - "5055:5055"
     environment:
       - ConnectionStrings__DefaultConnection=Server=db;Database=finance_dev;User=sa;Password=${SA_PASSWORD:-HomeOS@2024!};TrustServerCertificate=True
       - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-change-this-in-production-minimum-32-characters-long}
@@ -40,7 +40,7 @@ services:
       context: .
       dockerfile: Dockerfile.client
       args:
-        - VITE_API_URL=${API_URL:-http://192.168.15.13:5050}/api
+        - VITE_API_URL=${API_URL:-http://192.168.15.13:5055}/api
     container_name: homeos-client
     ports:
       - "80:80"

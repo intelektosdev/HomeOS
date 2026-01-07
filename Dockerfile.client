@@ -10,7 +10,7 @@ RUN npm ci
 COPY src/HomeOS.Client/ .
 
 # Build with API URL from build arg
-ARG VITE_API_URL=http://localhost:5050/api
+ARG VITE_API_URL=http://localhost:5055/api
 ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 

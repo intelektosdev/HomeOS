@@ -11,7 +11,7 @@ module.exports = function (api) {
                     "react-native-worklets/plugin": "react-native-worklets-core/lib/commonjs/plugin",
                 },
             }],
-            "react-native-reanimated/plugin",
+            // "react-native-reanimated/plugin", // Temporarily disabled for build
         ],
     };
 };

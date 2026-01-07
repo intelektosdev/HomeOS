@@ -1,4 +1,4 @@
-$baseUrl = "http://localhost:5050/api"
+$baseUrl = "http://localhost:5055/api"
 
 function Post-Request([string]$endpoint, [hashtable]$body) {
     $json = $body | ConvertTo-Json

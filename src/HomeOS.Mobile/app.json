@@ -25,11 +25,14 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.anonymous.homeosmobile"
+      "package": "com.anonymous.homeosmobile",
+      "autolink": {
+        "exclude": [
+          "react-native-reanimated"
+        ]
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -43,6 +46,12 @@
           "cameraPermission": "Permitir acesso à câmera para escanear códigos de barras."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "66a55852-69e1-4004-a3db-976697062a66"
+      }
+    }
   }
 }

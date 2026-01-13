@@ -19,6 +19,7 @@ import { CashFlowForecast } from './pages/CashFlowForecast';
 import { Budgets } from './pages/Budgets';
 import { Goals } from './pages/Goals';
 import { SimpleExpenseEntry } from './pages/SimpleExpenseEntry';
+import Transfers from './pages/Transfers';
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -209,6 +210,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Goals />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/transfers"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Transfers />
                 </MainLayout>
               </ProtectedRoute>
             }

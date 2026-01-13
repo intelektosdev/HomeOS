@@ -156,6 +156,11 @@ export function Sidebar() {
                                 <span className="nav-label">Transações</span>
                             </NavLinkMobile>
 
+                            <NavLinkMobile to="/transfers" className="nav-item">
+                                <span className="nav-icon">🔁</span>
+                                <span className="nav-label">Transferências</span>
+                            </NavLinkMobile>
+
                             <NavLinkMobile to="/recurring-transactions" className="nav-item">
                                 <span className="nav-icon">🔄</span>
                                 <span className="nav-label">Recorrências</span>

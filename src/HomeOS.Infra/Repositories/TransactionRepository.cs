@@ -133,17 +133,18 @@ public class TransactionRepository(IConfiguration configuration)
     public IEnumerable<dynamic> GetAnalyticsSummary(DateTime startDate, DateTime endDate, string groupBy, Guid userId)
     {
         // Build dynamic GROUP BY based on groupBy parameter
-        var groupByClause = groupBy.ToLower() switch
+        // For drill-down to work, Key must be the ID (for account/category) or status name (for status)
+        var keyColumn = groupBy.ToLower() switch
         {
-            "category" => "c.Name",
-            "account" => "COALESCE(a.Name, cc.Name)",
+            "category" => "c.Id",
+            "account" => "COALESCE(CAST(a.Id AS NVARCHAR(36)), CAST(cc.Id AS NVARCHAR(36)))",
             "status" => @"CASE 
                 WHEN t.StatusId = 1 THEN 'Pending'
                 WHEN t.StatusId = 2 THEN 'Paid'
                 WHEN t.StatusId = 3 THEN 'Conciliated'
                 WHEN t.StatusId = 4 THEN 'Cancelled'
             END",
-            _ => "c.Name" // default to category
+            _ => "c.Id" // default to category
         };
 
         var labelColumn = groupBy.ToLower() switch
@@ -161,7 +162,7 @@ public class TransactionRepository(IConfiguration configuration)
 
         var sql = $@"
         SELECT 
-            {groupByClause} as [Key],
+            {keyColumn} as [Key],
             {labelColumn} as Label,
             SUM(CASE WHEN t.Type = 1 THEN t.Amount ELSE 0 END) as Income,
             SUM(CASE WHEN t.Type = 2 THEN t.Amount ELSE 0 END) as Expense,
@@ -173,7 +174,7 @@ public class TransactionRepository(IConfiguration configuration)
         WHERE t.DueDate BETWEEN @StartDate AND @EndDate 
             AND t.UserId = @UserId
             AND t.StatusId != 4  -- Exclude Cancelled
-        GROUP BY {groupByClause}, {labelColumn}
+        GROUP BY {keyColumn}, {labelColumn}
         ORDER BY Expense DESC, Income DESC";
 
         using var connection = new SqlConnection(_connectionString);
@@ -198,6 +199,82 @@ public class TransactionRepository(IConfiguration configuration)
     }
 
     // LinkToBillPayment removed - This responsibility is now handled by CreditCardTransactionRepository / linking
+    
+    // Drill-down methods for dashboard analytics
+    public IEnumerable<Transaction> GetByAccount(Guid userId, Guid accountId, DateTime start, DateTime end)
+    {
+        const string sql = @"
+            SELECT *
+            FROM [Finance].[Transactions]
+            WHERE UserId = @UserId
+              AND AccountId = @AccountId
+              AND DueDate >= @Start
+              AND DueDate <= @End
+            ORDER BY DueDate DESC";
+        
+        using var connection = new SqlConnection(_connectionString);
+        var dbModels = connection.Query<TransactionDbModel>(sql, new { 
+            UserId = userId, 
+            AccountId = accountId, 
+            Start = start, 
+            End = end 
+        });
+        
+        return dbModels.Select(TransactionMapper.ToDomain);
+    }
+
+    public IEnumerable<Transaction> GetByCategory(Guid userId, Guid categoryId, DateTime start, DateTime end)
+    {
+        const string sql = @"
+            SELECT *
+            FROM [Finance].[Transactions]
+            WHERE UserId = @UserId
+              AND CategoryId = @CategoryId
+              AND DueDate >= @Start
+              AND DueDate <= @End
+            ORDER BY DueDate DESC";
+        
+        using var connection = new SqlConnection(_connectionString);
+        var dbModels = connection.Query<TransactionDbModel>(sql, new { 
+            UserId = userId, 
+            CategoryId = categoryId, 
+            Start = start, 
+            End = end 
+        });
+        
+        return dbModels.Select(TransactionMapper.ToDomain);
+    }
+
+    public IEnumerable<Transaction> GetByStatus(Guid userId, string status, DateTime start, DateTime end)
+    {
+        byte statusId = status.ToLower() switch
+        {
+            "pending" or "pendente" => 1,
+            "paid" or "pago" => 2,
+            "conciliated" or "conciliado" => 3,
+            "cancelled" or "cancelado" => 4,
+            _ => 1
+        };
+
+        const string sql = @"
+            SELECT *
+            FROM [Finance].[Transactions]
+            WHERE UserId = @UserId
+              AND StatusId = @StatusId
+              AND DueDate >= @Start
+              AND DueDate <= @End
+            ORDER BY DueDate DESC";
+        
+        using var connection = new SqlConnection(_connectionString);
+        var dbModels = connection.Query<TransactionDbModel>(sql, new { 
+            UserId = userId, 
+            StatusId = statusId, 
+            Start = start, 
+            End = end 
+        });
+        
+        return dbModels.Select(TransactionMapper.ToDomain);
+    }
     
     public void Delete(Guid id, Guid userId)
     {

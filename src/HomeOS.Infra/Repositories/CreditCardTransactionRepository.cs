@@ -27,6 +27,7 @@ public class CreditCardTransactionRepository(IConfiguration configuration)
                     Description = @Description,
                     Amount = @Amount,
                     TransactionDate = @TransactionDate,
+                    PostingDate = @PostingDate,
                     CategoryId = @CategoryId,
                     InstallmentId = @InstallmentId,
                     InstallmentNumber = @InstallmentNumber,
@@ -34,8 +35,8 @@ public class CreditCardTransactionRepository(IConfiguration configuration)
                     StatusId = @StatusId,
                     BillPaymentId = @BillPaymentId
             WHEN NOT MATCHED THEN
-                INSERT (Id, UserId, CreditCardId, CategoryId, Description, Amount, TransactionDate, CreatedAt, InstallmentId, InstallmentNumber, TotalInstallments, StatusId, BillPaymentId)
-                VALUES (@Id, @UserId, @CreditCardId, @CategoryId, @Description, @Amount, @TransactionDate, @CreatedAt, @InstallmentId, @InstallmentNumber, @TotalInstallments, @StatusId, @BillPaymentId);";
+                INSERT (Id, UserId, CreditCardId, CategoryId, Description, Amount, TransactionDate, PostingDate, CreatedAt, InstallmentId, InstallmentNumber, TotalInstallments, StatusId, BillPaymentId)
+                VALUES (@Id, @UserId, @CreditCardId, @CategoryId, @Description, @Amount, @TransactionDate, @PostingDate, @CreatedAt, @InstallmentId, @InstallmentNumber, @TotalInstallments, @StatusId, @BillPaymentId);";
 
         using var connection = new SqlConnection(_connectionString);
         connection.Open();

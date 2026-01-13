@@ -11,6 +11,7 @@ public class CreditCardTransactionDbModel
     public string Description { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public DateTime TransactionDate { get; set; }
+    public DateTime PostingDate { get; set; }
     public DateTime CreatedAt { get; set; }
     
     public Guid? InstallmentId { get; set; }

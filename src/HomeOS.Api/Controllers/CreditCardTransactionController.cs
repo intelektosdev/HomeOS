@@ -19,6 +19,15 @@ public class CreditCardTransactionController(
     [HttpPost]
     public IActionResult Create([FromBody] CreateCreditCardTransactionRequest request)
     {
+        // Calcular PostingDate padrão se não fornecido (usar TransactionDate)
+        var postingDate = request.PostingDate ?? request.TransactionDate;
+        
+        // Validação: PostingDate não pode ser anterior a TransactionDate
+        if (postingDate < request.TransactionDate)
+        {
+            return BadRequest(new { error = "Data de lançamento não pode ser anterior à data da compra" });
+        }
+        
         var transaction = new CreditCardTransaction(
             Guid.NewGuid(),
             request.CreditCardId,
@@ -27,6 +36,7 @@ public class CreditCardTransactionController(
             request.Description,
             request.Amount,
             request.TransactionDate,
+            postingDate,
             DateTime.Now,
             CreditCardTransactionStatus.Open,
             // Installments
@@ -51,7 +61,8 @@ public class CreditCardTransactionController(
              for (int i = 0; i < count; i++)
              {
                  decimal currentAmount = installmentValue + (i == 0 ? remainder : 0);
-                 DateTime currentDate = request.TransactionDate.AddMonths(i);
+                 DateTime currentTransactionDate = request.TransactionDate.AddMonths(i);
+                 DateTime currentPostingDate = postingDate.AddMonths(i);
                  
                  var t = new CreditCardTransaction(
                     Guid.NewGuid(),
@@ -60,7 +71,8 @@ public class CreditCardTransactionController(
                     request.CategoryId,
                     request.Description + $" ({i+1}/{count})",
                     currentAmount,
-                    currentDate,
+                    currentTransactionDate,
+                    currentPostingDate,
                     DateTime.Now,
                     CreditCardTransactionStatus.Open,
                     Microsoft.FSharp.Core.FSharpOption<Guid>.Some(installmentId),
@@ -104,6 +116,7 @@ public record CreateCreditCardTransactionRequest(
     string Description,
     decimal Amount,
     DateTime TransactionDate,
+    DateTime? PostingDate,
     int? Installments,
     Guid? ProductId
 );

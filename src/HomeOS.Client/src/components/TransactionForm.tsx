@@ -38,6 +38,7 @@ export function TransactionForm({ transaction, onSuccess, onCancel }: Transactio
     const [error, setError] = useState('');
     const [isInstallment, setIsInstallment] = useState(false);
     const [interestRate, setInterestRate] = useState<number>(0);
+    const [postingDelay, setPostingDelay] = useState<number>(0); // dias de atraso
 
     useEffect(() => {
         // Load dependencies
@@ -118,6 +119,12 @@ export function TransactionForm({ transaction, onSuccess, onCancel }: Transactio
         return finalAmount;
     };
 
+    const calculatePostingDate = (transactionDate: string, delayDays: number): string => {
+        const date = new Date(transactionDate);
+        date.setDate(date.getDate() + delayDays);
+        return date.toISOString().split('T')[0];
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -151,6 +158,9 @@ export function TransactionForm({ transaction, onSuccess, onCancel }: Transactio
                     description: formData.description,
                     amount: finalAmount,
                     transactionDate: formData.dueDate, // Date of purchase
+                    postingDate: postingDelay > 0
+                        ? calculatePostingDate(formData.dueDate || new Date().toISOString().split('T')[0], postingDelay)
+                        : undefined,
                     installments: isInstallment ? (formData.installmentCount || 2) : 1
                 });
             } else {
@@ -298,6 +308,31 @@ export function TransactionForm({ transaction, onSuccess, onCancel }: Transactio
                             {creditCards.map(cc => <option key={cc.id} value={cc.id}>{cc.name}</option>)}
                         </select>
                     )}
+
+                    {/* Campo de Prazo de Lançamento para Cartão de Crédito */}
+                    {isCreditCard && (
+                        <div style={{ marginTop: '1rem' }}>
+                            <label className="form-label">
+                                Prazo de Lançamento (dias após a compra)
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                max="365"
+                                className="form-input"
+                                value={postingDelay}
+                                onChange={e => setPostingDelay(parseInt(e.target.value) || 0)}
+                                placeholder="Ex: 45 dias"
+                            />
+                            {postingDelay > 0 && (
+                                <small style={{ color: 'var(--color-text-tertiary)', display: 'block', marginTop: '0.5rem' }}>
+                                    💳 Será lançado em: <strong>{calculatePostingDate(formData.dueDate || new Date().toISOString().split('T')[0], postingDelay)}</strong>
+                                </small>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Seção de Parcelamento */}
                     {isCreditCard && (
                         <div style={{ marginTop: '1rem', padding: '1rem', border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-secondary)' }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 500 }}>

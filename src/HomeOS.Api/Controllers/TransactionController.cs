@@ -241,6 +241,42 @@ public class TransactionController(
         return Ok(MapToResponse(updatedTransaction));
     }
 
+    // 8. GET: Drill-Down - Get transactions by group
+    [HttpGet("by-group")]
+    public IActionResult GetByGroup(
+        [FromQuery] string groupType,  // "account", "category", or "status"
+        [FromQuery] string groupKey,   // ID of account, category, or status value
+        [FromQuery] string? startDate,
+        [FromQuery] string? endDate)
+    {
+        var userId = GetCurrentUserId();
+        
+        try
+        {
+            var start = DateTime.Parse(startDate ?? DateTime.Now.AddMonths(-1).ToString("yyyy-MM-dd"));
+            var end = DateTime.Parse(endDate ?? DateTime.Now.ToString("yyyy-MM-dd"));
+            
+            IEnumerable<Transaction> transactions = groupType.ToLower() switch
+            {
+                "account" => _repository.GetByAccount(userId, Guid.Parse(groupKey), start, end),
+                "category" => _repository.GetByCategory(userId, Guid.Parse(groupKey), start, end),
+                "status" => _repository.GetByStatus(userId, groupKey, start, end),
+                _ => throw new ArgumentException($"Invalid groupType: {groupType}")
+            };
+            
+            var response = transactions.Select(MapToResponse).ToList();
+            return Ok(response);
+        }
+        catch (FormatException)
+        {
+            return BadRequest(new { error = "Invalid date format or GUID format" });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpDelete("{id}")]
     public IActionResult Delete(Guid id)
     {

@@ -194,7 +194,8 @@ public class ShoppingListController : ControllerBase
                     request.CategoryId,
                     installmentDesc,
                     currentAmount,
-                    currentDueDate, // TransactionDate
+                    currentDueDate, // TransactionDate (purchase date)
+                    currentDueDate, // PostingDate (same as purchase for immediate posting)
                     DateTime.Now,   // CreatedAt
                     HomeOS.Domain.FinancialTypes.CreditCardTransactionStatus.Open,
                     installmentId,

@@ -88,6 +88,7 @@ type CreditCardTransaction =
       Description: string
       Amount: Money
       TransactionDate: DateTime
+      PostingDate: DateTime // Data de lançamento na fatura
       CreatedAt: DateTime
       Status: CreditCardTransactionStatus
       InstallmentId: Guid option
@@ -289,3 +290,72 @@ module TransactionModule =
                 Ok
                     { transaction with
                         Status = TransactionStatus.Conciliated conciliatedAt }
+
+// --- TRANSFERS ---
+
+type TransferStatus =
+    | Pending
+    | Completed of completedAt: DateTime
+    | Cancelled of reason: string
+
+type Transfer =
+    { Id: Guid
+      FromAccountId: Guid
+      ToAccountId: Guid
+      Amount: Money
+      Description: string
+      TransferDate: DateTime
+      Status: TransferStatus
+      CreatedAt: DateTime
+      UserId: Guid }
+
+module TransferModule =
+
+    type TransferError =
+        | AmountMustBePositive
+        | SameAccountTransfer
+        | TransferAlreadyCompleted
+        | TransferIsCancelled
+
+    let create
+        (fromAccountId: Guid)
+        (toAccountId: Guid)
+        (amount: Money)
+        (description: string)
+        (transferDate: DateTime)
+        (userId: Guid)
+        : Result<Transfer, TransferError> =
+
+        if amount <= 0m then
+            Error AmountMustBePositive
+        elif fromAccountId = toAccountId then
+            Error SameAccountTransfer
+        else
+            Ok
+                { Id = Guid.NewGuid()
+                  FromAccountId = fromAccountId
+                  ToAccountId = toAccountId
+                  Amount = amount
+                  Description = description
+                  TransferDate = transferDate
+                  Status = Pending
+                  CreatedAt = DateTime.Now
+                  UserId = userId }
+
+    let complete (transfer: Transfer) (completedAt: DateTime) : Result<Transfer, TransferError> =
+        match transfer.Status with
+        | Pending ->
+            Ok
+                { transfer with
+                    Status = Completed completedAt }
+        | Completed _ -> Error TransferAlreadyCompleted
+        | Cancelled _ -> Error TransferIsCancelled
+
+    let cancel (transfer: Transfer) (reason: string) : Result<Transfer, TransferError> =
+        match transfer.Status with
+        | Pending ->
+            Ok
+                { transfer with
+                    Status = Cancelled reason }
+        | Completed _ -> Error TransferAlreadyCompleted
+        | Cancelled _ -> Error TransferIsCancelled

@@ -111,6 +111,7 @@ export interface CreateCreditCardTransactionRequest {
     description: string;
     amount: number;
     transactionDate: string;
+    postingDate?: string;
     installments?: number;
     productId?: string;
 }
@@ -266,3 +267,33 @@ export interface CashFlowForecastResponse {
     startingBalance: number;
     dataPoints: CashFlowDataPoint[];
 }
+
+// --- TRANSFERS ---
+
+export type TransferStatus = 'Pending' | 'Completed' | 'Cancelled';
+
+export interface CreateTransferRequest {
+    fromAccountId: string;
+    toAccountId: string;
+    amount: number;
+    description: string;
+    transferDate: string; // ISO Date
+}
+
+export interface TransferResponse {
+    id: string;
+    fromAccountId: string;
+    toAccountId: string;
+    amount: number;
+    description: string;
+    transferDate: string;
+    status: TransferStatus;
+    completedAt?: string;
+    cancelReason?: string;
+    createdAt: string;
+}
+
+export interface CancelTransferRequest {
+    reason: string;
+}
+

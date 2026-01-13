@@ -18,6 +18,7 @@ public static class CreditCardTransactionMapper
             Description = domain.Description,
             Amount = domain.Amount,
             TransactionDate = domain.TransactionDate,
+            PostingDate = domain.PostingDate,
             CreatedAt = domain.CreatedAt,
             
             // Status Mapping
@@ -51,6 +52,7 @@ public static class CreditCardTransactionMapper
             db.Description,
             db.Amount,
             db.TransactionDate,
+            db.PostingDate,
             db.CreatedAt,
             status,
             db.InstallmentId.HasValue ? FSharpOption<Guid>.Some(db.InstallmentId.Value) : FSharpOption<Guid>.None,

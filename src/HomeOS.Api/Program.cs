@@ -27,6 +27,7 @@ builder.Services.AddScoped<CreditCardTransactionRepository>();
 // Debt and Investment Repositories
 builder.Services.AddScoped<DebtRepository>();
 builder.Services.AddScoped<InvestmentRepository>();
+builder.Services.AddScoped<TransferRepository>();
 
 // Register Services
 builder.Services.AddScoped<JwtService>();

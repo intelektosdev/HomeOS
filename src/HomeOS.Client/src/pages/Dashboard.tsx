@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { AnalyticsService, DebtsService, InvestmentsService } from '../services/api';
-import type { AnalyticsSummaryResponse, GroupedDataResponse, DebtStatistics, PortfolioSummary } from '../types';
+import { AnalyticsService, DebtsService, InvestmentsService, TransactionsService } from '../services/api';
+import type { AnalyticsSummaryResponse, GroupedDataResponse, DebtStatistics, PortfolioSummary, TransactionResponse } from '../types';
 import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
 type PeriodFilter = 'today' | 'week' | 'month' | 'year' | 'custom';
@@ -17,6 +17,8 @@ export function Dashboard() {
     const [customStartDate, setCustomStartDate] = useState('');
     const [customEndDate, setCustomEndDate] = useState('');
     const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+    const [drillDownData, setDrillDownData] = useState<Record<string, TransactionResponse[]>>({});
+    const [loadingDrillDown, setLoadingDrillDown] = useState<string | null>(null);
 
     const getPeriodDates = (period: PeriodFilter): { start: string; end: string } => {
         const now = new Date();
@@ -90,6 +92,34 @@ export function Dashboard() {
             console.error('Failed to load analytics', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadDrillDownTransactions = async (groupKey: string) => {
+        // If already loaded, just toggle
+        if (drillDownData[groupKey]) {
+            setExpandedGroup(expandedGroup === groupKey ? null : groupKey);
+            return;
+        }
+
+        setLoadingDrillDown(groupKey);
+        setExpandedGroup(groupKey);
+
+        try {
+            const { start, end } = getPeriodDates(periodFilter);
+            const transactions = await TransactionsService.getByGroup(
+                groupBy,
+                groupKey,
+                start,
+                end
+            );
+
+            setDrillDownData(prev => ({ ...prev, [groupKey]: transactions }));
+        } catch (error) {
+            console.error('Failed to load drill-down transactions', error);
+            setExpandedGroup(null);
+        } finally {
+            setLoadingDrillDown(null);
         }
     };
 
@@ -480,10 +510,12 @@ export function Dashboard() {
                                         <td style={{ textAlign: 'center' }}>
                                             <button
                                                 className="btn btn-text"
-                                                onClick={() => setExpandedGroup(expandedGroup === group.key ? null : group.key)}
+                                                onClick={() => loadDrillDownTransactions(group.key)}
                                                 style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                                disabled={loadingDrillDown === group.key}
                                             >
-                                                {expandedGroup === group.key ? '▲ Fechar' : '▼ Ver Detalhes'}
+                                                {loadingDrillDown === group.key ? '⏳ Carregando...' :
+                                                    expandedGroup === group.key ? '▲ Fechar' : '▼ Ver Detalhes'}
                                             </button>
                                         </td>
                                     </tr>
@@ -492,10 +524,82 @@ export function Dashboard() {
                         </table>
                     </div>
                     {expandedGroup && (
-                        <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
-                            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                Drill-down para transações individuais do grupo "{summary.groups.find(g => g.key === expandedGroup)?.label}" virá em futuras melhorias.
-                            </p>
+                        <div style={{
+                            marginTop: '1rem',
+                            padding: '1.5rem',
+                            background: 'rgba(255,255,255,0.02)',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255,255,255,0.05)'
+                        }}>
+                            <h4 style={{ marginBottom: '1rem', fontSize: '0.95rem', color: 'var(--color-text-secondary)' }}>
+                                Transações em {summary.groups.find(g => g.key === expandedGroup)?.label}
+                            </h4>
+
+                            {!drillDownData[expandedGroup] ? (
+                                <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--color-text-tertiary)' }}>
+                                    Carregando transações...
+                                </div>
+                            ) : drillDownData[expandedGroup].length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--color-text-tertiary)' }}>
+                                    Nenhuma transação encontrada
+                                </div>
+                            ) : (
+                                <>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '400px', overflowY: 'auto' }}>
+                                        {drillDownData[expandedGroup].slice(0, 10).map(transaction => (
+                                            <div
+                                                key={transaction.id}
+                                                style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    padding: '0.75rem 1rem',
+                                                    background: 'rgba(255,255,255,0.03)',
+                                                    borderRadius: '6px',
+                                                    border: '1px solid rgba(255,255,255,0.05)',
+                                                    transition: 'all 0.2s',
+                                                    cursor: 'pointer'
+                                                }}
+                                                onClick={() => window.location.href = '/transactions'}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                                                    e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.3)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                                                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
+                                                }}
+                                            >
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>
+                                                        {transaction.description}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-tertiary)' }}>
+                                                        {new Date(transaction.dueDate).toLocaleDateString('pt-BR')} • {transaction.status}
+                                                    </div>
+                                                </div>
+                                                <div style={{
+                                                    fontSize: '1.1rem',
+                                                    fontWeight: 700,
+                                                    color: transaction.amount >= 0 ? 'var(--income-color)' : 'var(--expense-color)'
+                                                }}>
+                                                    {Math.abs(transaction.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {drillDownData[expandedGroup].length > 10 && (
+                                        <button
+                                            onClick={() => window.location.href = '/transactions'}
+                                            className="btn btn-secondary"
+                                            style={{ marginTop: '1rem', width: '100%' }}
+                                        >
+                                            Ver todas ({drillDownData[expandedGroup].length} transações) →
+                                        </button>
+                                    )}
+                                </>
+                            )}
                         </div>
                     )}
                 </div>

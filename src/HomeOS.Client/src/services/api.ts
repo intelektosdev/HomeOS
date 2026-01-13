@@ -157,6 +157,21 @@ export const TransactionsService = {
     },
     delete: async (id: string) => {
         await api.delete(`/transactions/${id}`);
+    },
+    getByGroup: async (
+        groupType: 'account' | 'category' | 'status',
+        groupKey: string,
+        startDate?: string,
+        endDate?: string
+    ): Promise<TransactionResponse[]> => {
+        const params = new URLSearchParams();
+        params.append('groupType', groupType);
+        params.append('groupKey', groupKey);
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+
+        const response = await api.get<TransactionResponse[]>(`/transactions/by-group?${params}`);
+        return response.data;
     }
 };
 
@@ -829,4 +844,40 @@ export const GoalsService = {
 
 export type GoalResponse = Goal;
 
+// ===== TRANSFER SERVICES =====
 
+export const TransfersService = {
+    create: async (data: import('../types').CreateTransferRequest): Promise<import('../types').TransferResponse> => {
+        const response = await api.post('/transfers', data);
+        return response.data;
+    },
+
+    getAll: async (year?: number, month?: number): Promise<import('../types').TransferResponse[]> => {
+        const params = new URLSearchParams();
+        if (year) params.append('year', year.toString());
+        if (month) params.append('month', month.toString());
+
+        const query = params.toString();
+        const response = await api.get(`/transfers${query ? '?' + query : ''}`);
+        return response.data;
+    },
+
+    getById: async (id: string): Promise<import('../types').TransferResponse> => {
+        const response = await api.get(`/transfers/${id}`);
+        return response.data;
+    },
+
+    complete: async (id: string): Promise<void> => {
+        await api.patch(`/transfers/${id}/complete`);
+    },
+
+    cancel: async (id: string, data: import('../types').CancelTransferRequest): Promise<void> => {
+        await api.patch(`/transfers/${id}/cancel`, data);
+    },
+
+    delete: async (id: string): Promise<void> => {
+        await api.delete(`/transfers/${id}`);
+    }
+};
+
+export default api;
